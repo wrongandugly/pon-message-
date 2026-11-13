@@ -1,0 +1,2180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PON — suas salas</title>
+<meta name="theme-color" content="#3f8fe0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PON">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%233f8fe0'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%233f8fe0'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3EP%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    --blue1:#3f8fe0; --blue2:#8ec9f7; --ink:#16324a; --mut:#6b8299;
+    --green:#43c72e; --orange:#f39c23; --red:#e5484d; --grey:#a7b4c0;
+    --card:#ffffff; --bg:#eef5fb;
+  }
+  html,body{ height:100%; }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg); color:var(--ink);
+    max-width:480px; margin:0 auto; min-height:100dvh;
+    display:flex; flex-direction:column;
+    box-shadow:0 0 40px rgba(30,80,130,.12);
+  }
+
+  /* ---------- MEU CANTO (cabeçalho compacto) ---------- */
+  header{
+    background:linear-gradient(160deg,var(--blue1) 0%,#5ea9ec 55%,var(--blue2) 100%);
+    color:#fff; padding:16px 16px 13px; position:relative; overflow:hidden;
+  }
+  header::after{
+    content:""; position:absolute; right:-50px; top:-70px; width:190px; height:190px;
+    background:radial-gradient(circle,rgba(255,255,255,.35),rgba(255,255,255,0) 70%);
+    border-radius:50%; pointer-events:none;
+  }
+  .brand-row{ display:flex; align-items:center; gap:8px; position:relative; z-index:1; margin-bottom:10px; }
+  .brand{ font-weight:800; letter-spacing:.22em; font-size:13px; }
+  .brand small{ letter-spacing:.02em; font-weight:600; opacity:.85; margin-left:6px; }
+  #btnSound{
+    margin-left:auto; border:1.5px solid rgba(255,255,255,.5); background:rgba(255,255,255,.16);
+    color:#fff; border-radius:11px; width:38px; height:38px; font-size:17px; cursor:pointer; flex:0 0 auto;
+  }
+  #btnSound:active{ transform:scale(.94); }
+  .me-row{ display:flex; align-items:center; gap:11px; position:relative; z-index:1; cursor:pointer; }
+  .avatar{
+    width:48px; height:48px; border-radius:50%; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.18); border:2px solid rgba(255,255,255,.75);
+    position:relative; overflow:hidden;
+  }
+  .me-txt{ flex:1; min-width:0; }
+  .me-name{ font-size:18.5px; font-weight:700; display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; }
+  .me-handle{ font-size:12px; opacity:.85; font-weight:600; }
+  .me-frase{ font-size:12.5px; opacity:.92; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dot{
+    width:12px; height:12px; border-radius:50%; flex:0 0 auto;
+    border:2px solid #fff; box-shadow:0 0 0 2px rgba(0,0,0,.06);
+  }
+  .dot.sm{ width:10px; height:10px; border-width:1.5px; }
+  .dot.online{ background:var(--green); } .dot.away{ background:var(--orange); }
+  .dot.busy{ background:var(--red); } .dot.invisible,.dot.offline{ background:var(--grey); }
+  .dot.pulse-c{ animation:pulseC 2.2s infinite; }
+  @keyframes pulseC{
+    0%{ box-shadow:0 0 0 0 rgba(67,199,46,.45); }
+    70%{ box-shadow:0 0 0 6px rgba(67,199,46,0); }
+    100%{ box-shadow:0 0 0 0 rgba(67,199,46,0); }
+  }
+  .presence-bar{ display:flex; gap:6px; margin-top:11px; position:relative; z-index:1; }
+  .pbtn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+    background:rgba(255,255,255,.16); border:1.5px solid rgba(255,255,255,.35);
+    color:#fff; border-radius:16px; padding:6px 2px; font-size:11.5px; font-weight:600; cursor:pointer;
+  }
+  .pbtn .dot{ border:none; box-shadow:none; width:9px; height:9px; }
+  .pbtn.sel{ background:#fff; color:var(--ink); border-color:#fff; }
+  /* editor de identidade embutido (compacto) */
+  .id-edit{
+    display:none; margin-top:11px; position:relative; z-index:1;
+    background:rgba(255,255,255,.96); border-radius:13px; padding:11px 12px; color:var(--ink);
+  }
+  .id-edit.open{ display:block; }
+  .id-edit .row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .id-edit label{ width:52px; font-size:11px; font-weight:700; color:var(--mut); text-transform:uppercase; letter-spacing:.05em; flex:0 0 auto; }
+  .id-edit input{
+    flex:1; min-width:0; border:1.5px solid #d7e6f2; border-radius:9px; padding:8px 10px;
+    font-size:14.5px; outline:none; color:var(--ink); background:#fbfdff;
+  }
+  .id-edit input:focus{ border-color:var(--blue1); }
+  .id-edit .btns{ display:flex; gap:8px; margin-top:2px; }
+  .id-edit .btns button{
+    flex:1; border:none; border-radius:10px; padding:9px 0; font-size:13.5px; font-weight:700; cursor:pointer;
+  }
+  #edSave{ background:linear-gradient(150deg,var(--blue1),#63aaea); color:#fff; }
+  #edCancel{ background:#eef5fb; color:var(--ink); border:1.5px solid #d7e6f2 !important; }
+
+  /* ---------- NAVEGAÇÃO / ENTRADA ---------- */
+  main{ flex:1; padding:14px 14px 10px; }
+  .hall-title{ font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--mut); margin:2px 4px 10px; }
+  #hall{ display:flex; flex-direction:column; gap:12px; }
+  .door-card{
+    background:linear-gradient(170deg,#fdf6ea,#f7e8cf); border:2px solid #d9b98c; border-radius:18px;
+    padding:14px 15px; display:flex; gap:14px; align-items:center; cursor:pointer; position:relative;
+    box-shadow:0 3px 10px rgba(120,80,30,.10); transition:transform .15s;
+  }
+  .door-card:active{ transform:scale(.985); }
+  .door-card .door-ico{
+    font-size:40px; line-height:1; flex:0 0 auto; width:58px; height:58px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.55);
+  }
+  .door-card .door-main{ flex:1; min-width:0; }
+  .door-card .door-name{ font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .door-card .door-who{ font-size:12.5px; color:#7a6547; margin-top:3px; }
+  .door-card .door-faces{ display:flex; gap:5px; margin-top:8px; flex-wrap:wrap; }
+  .mini-face{
+    width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:#fff; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.18);
+    position:relative;
+  }
+  .mini-face.absent{ filter:grayscale(1); opacity:.38; }
+  .mini-face .dot{ position:absolute; right:-2px; bottom:-2px; width:9px; height:9px; border-width:1.5px; }
+  .door-card.talking{
+    border-color:#f0b429; box-shadow:0 0 0 3px rgba(240,180,41,.35), 0 0 22px rgba(240,180,41,.45);
+    animation:doorPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes doorPulse{
+    0%,100%{ box-shadow:0 0 0 3px rgba(240,180,41,.30), 0 0 14px rgba(240,180,41,.30); }
+    50%{ box-shadow:0 0 0 4px rgba(240,180,41,.50), 0 0 28px rgba(240,180,41,.60); }
+  }
+  .door-card .door-talk{ font-size:12px; font-weight:600; color:#9a8560; margin-top:5px; display:block; }
+  .door-card.talking .door-talk{ font-weight:700; color:#a86e00; }
+  .door-card.create{ background:#fff; border-style:dashed; border-color:#b9d4ea; box-shadow:none; }
+  .door-card.create .door-name{ color:var(--blue1); }
+  .door-card.create .door-who{ color:var(--mut); }
+  /* nascimento vazio de verdade */
+  .birth{
+    display:none; text-align:center; padding:28px 18px 10px;
+  }
+  .birth.show{ display:block; }
+  .birth .b-emoji{ font-size:54px; }
+  .birth h2{ font-size:20px; margin-top:10px; }
+  .birth p{ font-size:14px; color:var(--mut); line-height:1.5; margin:9px auto 16px; max-width:300px; }
+  .big-btn{
+    border:none; border-radius:14px; padding:14px 22px; font-size:16px; font-weight:700; cursor:pointer;
+    background:linear-gradient(150deg,var(--blue1),#63aaea); color:#fff; box-shadow:0 4px 14px rgba(63,143,224,.35);
+  }
+  .big-btn:active{ transform:scale(.97); }
+  .join-row{ display:flex; gap:8px; margin-top:16px; }
+  .join-row input{
+    flex:1; min-width:0; padding:12px 13px; border:1.5px solid #d7e6f2; border-radius:13px;
+    font-size:14.5px; outline:none; color:var(--ink); background:#fff; text-transform:uppercase; letter-spacing:.12em;
+  }
+  .join-row input:focus{ border-color:var(--blue1); }
+  .join-row button{
+    border:none; border-radius:13px; padding:0 18px; font-size:14px; font-weight:700; cursor:pointer;
+    background:#16324a; color:#fff;
+  }
+  .hall-hint{ font-size:11.5px; color:#9db2c4; text-align:center; margin-top:12px; line-height:1.5; }
+
+  /* ---------- A SALA ---------- */
+  #roomWrap{ position:relative; }
+  .room-head{ display:flex; align-items:center; gap:8px; margin:0 2px 10px; }
+  .room-head .rh-name{ font-size:16.5px; font-weight:700; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #btnHall, .rh-btn{
+    border:1.5px solid #d7e6f2; background:#fff; color:var(--ink); border-radius:10px;
+    padding:7px 12px; font-size:13px; font-weight:650; cursor:pointer;
+  }
+  #btnInvite{
+    border:none; background:linear-gradient(150deg,var(--blue1),#63aaea); color:#fff; border-radius:10px;
+    padding:8px 12px; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .room{
+    position:relative; height:392px; border-radius:20px; overflow:hidden;
+    box-shadow:0 6px 20px rgba(30,80,130,.13), inset 0 0 0 2px #d9b98c;
+    background:linear-gradient(#f3e2c2 0%, #f3e2c2 58%, #d9a066 58.2%, #c98d54 100%);
+  }
+  .floor{
+    position:absolute; left:0; right:0; top:58%; bottom:0; pointer-events:none;
+    background:
+      repeating-linear-gradient(90deg, rgba(122,74,32,.15) 0 2px, rgba(122,74,32,0) 2px 54px),
+      linear-gradient(#dfa96d 0%, #d29a58 45%, #c38447 100%);
+    box-shadow:inset 0 7px 8px -4px rgba(122,74,32,.4);
+  }
+  .baseboard{
+    position:absolute; left:0; right:0; top:calc(58% - 5px); height:6px; pointer-events:none;
+    background:linear-gradient(#caa066,#a5713f); box-shadow:0 1px 2px rgba(90,50,20,.3);
+  }
+  .gshadow{
+    position:absolute; height:11px; border-radius:50%; pointer-events:none;
+    background:radial-gradient(ellipse at center, rgba(96,54,20,.34), rgba(96,54,20,0) 70%);
+  }
+  .char-shadow{
+    position:absolute; left:50%; bottom:-2px; transform:translateX(-50%);
+    width:64px; height:12px; border-radius:50%; pointer-events:none; z-index:-1;
+    background:radial-gradient(ellipse at center, rgba(96,54,20,.38), rgba(96,54,20,0) 68%);
+    transition:all .25s ease;
+  }
+  .char.dragging .char-shadow{ width:84px; height:15px; opacity:.55; }
+  .sky-win{
+    position:absolute; left:20px; top:18px; width:96px; height:82px; border-radius:10px;
+    border:5px solid #a5713f; overflow:hidden; box-shadow:inset 0 0 12px rgba(0,0,0,.15);
+    transition:background 1s; z-index:1;
+  }
+  .sky-win.dia{ background:linear-gradient(#8fd3ff,#dff4ff); }
+  .sky-win.tarde{ background:linear-gradient(#ff9e5e,#ffd9a0); }
+  .sky-win.noite{ background:linear-gradient(#16264f,#33507e); }
+  .sky-win .astro{ position:absolute; right:9px; top:7px; font-size:20px; }
+  .sky-win .nuvem{ position:absolute; font-size:14px; opacity:.9; animation:drift 9s ease-in-out infinite alternate; }
+  @keyframes drift{ from{ transform:translateX(-4px); } to{ transform:translateX(10px); } }
+  .door-prop{
+    position:absolute; right:22px; top:12px; width:52px; height:100px; z-index:1;
+    background:linear-gradient(#b07a45,#96622f); border-radius:8px 8px 0 0;
+    border:3px solid #7d5225; box-shadow:inset 0 0 0 4px rgba(255,255,255,.08);
+  }
+  .door-prop::after{ content:""; position:absolute; right:6px; top:50px; width:8px; height:8px; border-radius:50%; background:#ffd97a; }
+  .door-prop.flash{ animation:doorFlash .9s ease 2; }
+  @keyframes doorFlash{ 0%,100%{ filter:none; } 50%{ filter:brightness(1.5); } }
+  .plant-prop{ position:absolute; left:128px; bottom:92px; font-size:28px; line-height:1; z-index:1; }
+  .corkboard{
+    position:absolute; left:50%; top:12px; transform:translateX(-50%); z-index:2;
+    width:158px; height:98px; border-radius:8px; cursor:pointer;
+    background:linear-gradient(#c98f56,#bd8148); border:5px solid #8a5a33;
+    box-shadow:0 3px 8px rgba(90,50,20,.28); padding:6px; overflow:hidden;
+  }
+  .corkboard .cb-title{ font-size:9.5px; font-weight:800; letter-spacing:.06em; color:#5f3c1c; text-transform:uppercase; text-align:center; }
+  .corkboard .cb-notes{ display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; justify-content:center; }
+  .cb-sticky{
+    background:#fff6a8; color:#5f5410; font-size:8.5px; line-height:1.15; padding:3px 4px;
+    width:44px; height:30px; overflow:hidden; border-radius:2px; box-shadow:0 1px 3px rgba(0,0,0,.25);
+    transform:rotate(-2deg);
+  }
+  .cb-sticky:nth-child(2n){ transform:rotate(2deg); background:#ffd9ec; color:#6e2447; }
+  .cb-sticky:nth-child(3n){ background:#cfeecb; color:#265c1f; }
+  .corkboard .cb-empty{ font-size:9.5px; color:#5f3c1c; text-align:center; margin-top:10px; font-style:italic; }
+  .cb-sticky.cb-fix{ background:#fff; color:#20507c; font-weight:700; text-align:center; transform:rotate(0); cursor:pointer; }
+  .rug{
+    position:absolute; left:50%; bottom:52px; transform:translateX(-50%); z-index:1;
+    width:190px; height:46px; border-radius:50%;
+    background:radial-gradient(ellipse at center,#e88ca0 0%,#d96b84 62%,#c95572 100%); opacity:.8;
+  }
+  .coffee{
+    position:absolute; left:50%; top:57%; transform:translate(-50%,-100%);
+    text-align:center; pointer-events:none; z-index:4; line-height:0;
+  }
+  .coffee .steam{ display:block; font-size:11px; color:rgba(255,255,255,.85); line-height:1; animation:steamUp 2.4s ease-in-out infinite; height:12px; }
+  @keyframes steamUp{ 0%,100%{ transform:translateY(2px); opacity:.35; } 50%{ transform:translateY(-3px); opacity:.9; } }
+  .ghost-note{
+    position:absolute; left:10px; top:10px; z-index:30;
+    background:rgba(22,50,74,.82); color:#fff; font-size:12px; font-weight:600;
+    padding:6px 11px; border-radius:16px; display:none;
+  }
+  .ghost-note.show{ display:block; }
+
+  /* poltronas + bonecos */
+  #roomChars{ position:absolute; inset:0; z-index:10; }
+  .char{
+    position:absolute; width:84px; text-align:center; cursor:grab;
+    transform:translate(-50%,-100%);
+    transition:left 1.2s ease, top 1.2s ease;
+    touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  .char.dragging{ transition:none; cursor:grabbing; z-index:60; }
+  .char.dragging .char-inner{ transform:scale(1.06); }
+  .char-inner{ display:flex; flex-direction:column; align-items:center; animation:bob 3.4s ease-in-out infinite; transition:transform .2s ease; }
+  @keyframes bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-2px); } }
+  .char.shake .char-inner{ animation:nudgeShake .7s ease-in-out 2; }
+  .bal-col{ display:flex; flex-direction:column; align-items:center; will-change:transform; }
+  .balloon{
+    position:relative; background:#fff; border-radius:13px; padding:6px 9px 5px;
+    font-size:12.5px; line-height:1.3; color:var(--ink); max-width:150px;
+    box-shadow:0 3px 10px rgba(30,80,130,.18); margin-bottom:5px; z-index:5; text-align:left;
+  }
+  .balloon::after{
+    content:""; position:absolute; left:50%; bottom:-6px; transform:translateX(-50%);
+    border:6px solid transparent; border-top-color:#fff; border-bottom:none;
+  }
+  .balloon .cd{ display:block; font-size:9.5px; font-weight:700; color:#b3852f; margin-top:2px; }
+  .balloon.mine{ background:#eaf5ff; }
+  .balloon.mine::after{ border-top-color:#eaf5ff; }
+  .whisper-bal{
+    position:relative; background:rgba(255,255,255,.85); border:1.5px dashed #8fb8dd;
+    border-radius:11px; padding:4px 8px 3px; font-size:11.5px; line-height:1.25; color:#33536f;
+    max-width:132px; margin-bottom:4px; z-index:5; box-shadow:0 2px 6px rgba(30,80,130,.12); text-align:left;
+  }
+  .whisper-bal.mine{ border-color:#d8a04a; background:rgba(255,246,232,.92); color:#7a5410; }
+  .whisper-bal .cd{ display:block; font-size:9px; font-weight:700; color:#7d97ac; margin-top:1px; }
+  .seatwrap{ position:relative; width:80px; height:86px; line-height:0; }
+  .seatwrap .chair-svg{ position:absolute; left:50%; bottom:0; transform:translateX(-50%); }
+  .seatwrap .fig{ position:absolute; left:50%; bottom:30px; transform:translateX(-50%); line-height:0; }
+  .seatwrap .prop{ position:absolute; font-size:16px; z-index:3; line-height:1; }
+  .prop.phone{ right:2px; bottom:44px; }
+  .prop.laptop{ left:50%; bottom:26px; transform:translateX(-50%); font-size:17px; z-index:5; }
+  .prop.fone{ left:50%; top:-16px; transform:translateX(-50%); font-size:18px; }
+  .prop.zzz{ right:0; top:-18px; font-size:14px; animation:zzzFloat 2.2s ease-in-out infinite; }
+  @keyframes zzzFloat{ 0%,100%{ transform:translateY(0); opacity:.85; } 50%{ transform:translateY(-4px); opacity:1; } }
+  .prop.nota{ left:0; top:-14px; font-size:13px; animation:zzzFloat 1.8s ease-in-out infinite; }
+  .seatwrap .jacket{ position:absolute; left:50%; bottom:22px; transform:translateX(-50%); font-size:30px; z-index:4; line-height:1; }
+  .sig-burst{
+    position:absolute; left:50%; top:6px; transform:translateX(-50%); z-index:8;
+    font-size:44px; pointer-events:none; animation:burst 1.4s ease forwards;
+  }
+  @keyframes burst{
+    0%{ opacity:0; transform:translateX(-50%) scale(.3); }
+    25%{ opacity:1; transform:translateX(-50%) scale(1.25); }
+    45%{ transform:translateX(-50%) scale(1); }
+    80%{ opacity:1; } 100%{ opacity:0; transform:translateX(-50%) translateY(-14px) scale(1.05); }
+  }
+  .char.fora{ cursor:grab; opacity:.95; }
+  .fora-name{ font-size:10px; font-weight:700; color:#7a6a55; background:rgba(255,255,255,.75); border-radius:8px; padding:1px 6px; display:inline-block; margin-top:1px; position:relative; z-index:6; }
+  .under-name{
+    display:flex; align-items:center; justify-content:center; gap:5px; margin-top:3px;
+    font-size:11px; font-weight:700; color:#6d5136;
+    background:rgba(255,255,255,.78); border-radius:8px; padding:1px 7px; position:relative; z-index:6;
+    white-space:nowrap;
+  }
+  .under-name .dot{ width:8px; height:8px; border:none; box-shadow:none; }
+  .talk-chip{
+    position:absolute; left:50%; top:-8px; transform:translateX(-50%); z-index:9;
+    background:#fff; border:1.5px solid #f0b429; border-radius:16px; padding:2px 9px;
+    font-size:13px; cursor:pointer; box-shadow:0 2px 7px rgba(30,80,130,.2);
+    animation:bob 2.2s ease-in-out infinite;
+  }
+  @keyframes nudgeShake{
+    0%,100%{ transform:translate(0,0); }
+    10%{ transform:translate(-5px,2px) rotate(-1deg); }
+    20%{ transform:translate(5px,-2px) rotate(1deg); }
+    30%{ transform:translate(-6px,-1px); } 40%{ transform:translate(6px,2px); }
+    50%{ transform:translate(-5px,-2px) rotate(1deg); } 60%{ transform:translate(5px,1px); }
+    70%{ transform:translate(-4px,2px); } 80%{ transform:translate(4px,-1px); }
+    90%{ transform:translate(-2px,1px); }
+  }
+  .shaking{ animation:nudgeShake .7s ease-in-out 2; }
+
+  /* falar + verbos */
+  .talk-bar{ display:flex; gap:8px; margin-top:11px; }
+  #talkInput{
+    flex:1; min-width:0; padding:12px 13px; border:1.5px solid #d7e6f2; border-radius:13px;
+    font-size:14.5px; outline:none; color:var(--ink); background:#fff;
+  }
+  #talkInput:focus{ border-color:var(--blue1); }
+  #btnSay{
+    border:none; border-radius:13px; padding:0 20px; font-size:14.5px; font-weight:700; cursor:pointer;
+    background:linear-gradient(150deg,var(--blue1),#63aaea); color:#fff;
+  }
+  #btnSay:active{ transform:scale(.96); }
+  .talk-hint{ font-size:11px; color:#9db2c4; margin-top:6px; text-align:center; }
+  .verb-bar{ display:flex; gap:8px; margin-top:11px; }
+  .vbar-btn{
+    flex:1; border:1.5px solid #d7e6f2; background:#fff; color:var(--ink);
+    border-radius:12px; padding:10px 0; font-size:14px; font-weight:700; cursor:pointer;
+    box-shadow:0 2px 6px rgba(30,80,130,.06);
+  }
+  .vbar-btn:active{ transform:scale(.96); background:#eaf5ff; }
+  .alone-card{
+    display:none; margin-top:11px; background:#fff; border:1.5px dashed #d7e6f2;
+    border-radius:14px; padding:12px 14px; align-items:center; gap:10px;
+    font-size:13.5px; color:#40607c;
+  }
+  .alone-card.show{ display:flex; }
+  .alone-card .alone-txt{ flex:1; }
+  .alone-card button{
+    border:none; border-radius:10px; padding:9px 13px; font-size:13px; font-weight:700; cursor:pointer;
+    background:linear-gradient(150deg,var(--blue1),#63aaea); color:#fff; flex:0 0 auto;
+  }
+  .law-line{ font-size:11px; color:#9db2c4; text-align:center; margin-top:10px; }
+
+  /* sinal gigante */
+  #bigSignal{
+    position:fixed; inset:0; z-index:80; display:none;
+    align-items:center; justify-content:center; pointer-events:none;
+    background:radial-gradient(circle, rgba(255,255,255,.25), rgba(255,255,255,0) 65%);
+  }
+  #bigSignal.show{ display:flex; }
+  #bigSignal .big-emoji{ font-size:150px; animation:bigPop 1.5s ease forwards; }
+  @keyframes bigPop{
+    0%{ transform:scale(.2) rotate(-8deg); opacity:0; }
+    22%{ transform:scale(1.18) rotate(3deg); opacity:1; }
+    40%{ transform:scale(1); }
+    78%{ opacity:1; transform:scale(1.04); }
+    100%{ transform:scale(1.1) translateY(-10px); opacity:0; }
+  }
+
+  /* ---------- PAINÉIS (sheets) ---------- */
+  #sheetWrap{
+    position:fixed; inset:0; background:rgba(15,40,65,.45);
+    display:none; align-items:flex-end; justify-content:center; z-index:40;
+  }
+  #sheetWrap.open{ display:flex; }
+  .sheet{
+    background:#fff; width:100%; max-width:480px; border-radius:22px 22px 0 0;
+    padding:22px 20px calc(20px + env(safe-area-inset-bottom)); animation:sheetUp .25s ease;
+    max-height:88dvh; overflow-y:auto;
+  }
+  @keyframes sheetUp{ from{ transform:translateY(40px); opacity:.4; } to{ transform:none; opacity:1; } }
+  .sheet-top{ display:flex; align-items:center; gap:14px; }
+  .s-avatar{
+    width:62px; height:62px; border-radius:50%; flex:0 0 auto; position:relative;
+    display:flex; align-items:center; justify-content:center; font-size:30px; overflow:hidden;
+  }
+  .s-avatar .dot{ position:absolute; right:1px; bottom:1px; }
+  .sheet-name{ font-size:20px; font-weight:700; }
+  .sheet-pres{ font-size:13px; color:var(--mut); display:flex; align-items:center; gap:6px; margin-top:2px; }
+  .sheet-frase{ font-style:italic; font-size:15.5px; color:#33536f; margin-top:14px; min-height:22px; }
+  .sheet-handle{ font-size:12.5px; color:var(--mut); margin-top:3px; }
+  .sheet-actions{ display:flex; gap:10px; margin-top:18px; }
+  .abtn{
+    flex:1; border:none; border-radius:13px; padding:13px 6px; font-size:15px; font-weight:650; cursor:pointer;
+  }
+  .abtn.nudge{ background:linear-gradient(150deg,var(--blue1),#63aaea); color:#fff; }
+  .abtn.wave{ background:#eef5fb; color:var(--ink); border:1.5px solid #d7e6f2; }
+  .abtn.danger{ background:#fdeeee; color:#b3261e; border:1.5px solid #f3c2c0; }
+  .abtn:active{ transform:scale(.97); }
+  .sheet-close{ width:100%; margin-top:10px; background:none; border:none; color:var(--mut); font-size:14px; padding:8px; cursor:pointer; }
+  .sec-title{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--mut); margin:18px 0 9px; }
+  .sec-title span{ text-transform:none; letter-spacing:0; color:#a9bccb; font-size:11px; margin-left:5px; }
+  .sig-row{ display:flex; gap:9px; }
+  .sig-btn{
+    flex:1; font-size:23px; padding:9px 0; border-radius:13px; cursor:pointer;
+    background:#f4faff; border:1.5px solid #d7e6f2;
+  }
+  .sig-btn:active{ transform:scale(.93); background:#e4f2fd; }
+  .txt-input{
+    width:100%; padding:11px 12px; border:1.5px solid #d7e6f2; border-radius:11px;
+    font-size:14.5px; outline:none; color:var(--ink); background:#fbfdff;
+  }
+  .txt-input:focus{ border-color:var(--blue1); }
+  .abtn.wide{ width:100%; margin-top:10px; background:#16324a; color:#fff; }
+  .note-quote{
+    font-size:13.5px; border-radius:10px; padding:8px 10px; margin-bottom:8px;
+    display:flex; align-items:center; gap:7px;
+  }
+  .note-quote .q-txt{ flex:1; min-width:0; }
+  .note-quote .cd{ font-size:11px; font-weight:700; white-space:nowrap; }
+  .note-quote.in{ background:#fff6e8; border:1px solid #f3d9a4; color:#7a5410; }
+  .note-quote.in .cd{ color:#b3852f; }
+  .note-quote.out{ background:#eaf5ff; border:1px solid #b9dcf8; color:#20507c; }
+  .note-quote.out .cd{ color:#5b87ab; }
+  .note-reply-hint{ font-size:11px; color:#b3852f; margin:-3px 0 9px 2px; }
+
+  /* mural */
+  .mural-list{ display:flex; flex-direction:column; gap:9px; margin-top:4px; }
+  .mural-note{
+    border-radius:10px; padding:10px 12px; font-size:14.5px; position:relative;
+    box-shadow:0 2px 6px rgba(0,0,0,.10); transform:rotate(-.5deg);
+  }
+  .mural-note:nth-child(2n){ transform:rotate(.6deg); }
+  .mural-note .mn-txt{ line-height:1.35; }
+  .mural-note .mn-meta{ display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:11.5px; font-weight:700; opacity:.75; }
+  .mural-note .mn-to{ font-weight:800; color:#20507c; }
+  .mural-note .mn-del{ position:absolute; top:6px; right:8px; border:none; background:none; font-size:13px; cursor:pointer; opacity:.55; }
+  .mural-empty{ font-size:14px; color:var(--mut); font-style:italic; padding:8px 2px; }
+  .mural-form{ margin-top:16px; border-top:1px dashed #d7e6f2; padding-top:14px; }
+  .to-row{ display:flex; gap:7px; flex-wrap:wrap; margin:9px 0; }
+  .to-chip{
+    border:1.5px solid #d7e6f2; background:#fff; color:var(--mut); border-radius:16px;
+    padding:6px 12px; font-size:13px; font-weight:650; cursor:pointer;
+  }
+  .to-chip.sel{ background:linear-gradient(150deg,var(--blue1),#63aaea); color:#fff; border-color:transparent; }
+
+  /* convite */
+  .inv-link{
+    background:#eaf5ff; border:1px solid #b9dcf8; border-radius:10px; padding:9px 11px;
+    font-size:13.5px; font-weight:650; color:#20507c; word-break:break-all; margin-top:4px;
+  }
+  .inv-code{ font-size:24px; font-weight:800; letter-spacing:.18em; text-align:center; margin:12px 0 2px; }
+  .inv-code-label{ font-size:11px; color:var(--mut); text-align:center; text-transform:uppercase; letter-spacing:.08em; }
+  .inv-count{ font-size:13px; color:var(--mut); text-align:center; margin-top:10px; }
+  .inv-warn{ font-size:12px; color:#9a6a1c; background:#fff6e8; border:1px solid #f3d9a4; border-radius:10px; padding:8px 10px; margin-top:12px; line-height:1.45; }
+
+  /* criar sala */
+  .emoji-row, .color-row{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 4px; }
+  .pick-btn{
+    width:44px; height:44px; border-radius:12px; border:1.5px solid #d7e6f2; background:#fff;
+    font-size:21px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .pick-btn.sel{ border-color:var(--blue1); background:#eaf5ff; box-shadow:0 0 0 2px rgba(63,143,224,.25); }
+  .color-btn{ width:34px; height:34px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1.5px #d7e6f2; cursor:pointer; }
+  .color-btn.sel{ box-shadow:0 0 0 3px var(--blue1); }
+
+  /* fotos */
+  .photo-grid{ display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+  .polaroid{
+    background:#fff; border:1px solid #e3e3e3; border-radius:6px; padding:7px 7px 9px;
+    width:104px; box-shadow:0 3px 9px rgba(30,60,90,.13); transform:rotate(-1.5deg);
+  }
+  .polaroid:nth-child(2n){ transform:rotate(1.2deg); }
+  .polaroid img{ width:100%; height:76px; object-fit:cover; border-radius:3px; display:block; background:#dfe9f2; }
+  .polaroid .p-cap{ font-size:10.5px; color:#33536f; margin-top:5px; line-height:1.25; min-height:13px; word-break:break-word; }
+  .polaroid .p-meta{ font-size:9.5px; font-weight:700; color:#b3852f; margin-top:3px; display:flex; justify-content:space-between; align-items:center; }
+  .polaroid .p-react{ border:none; background:none; font-size:14px; cursor:pointer; padding:0; }
+  .photo-empty{ font-size:13.5px; color:var(--mut); font-style:italic; }
+  .photo-count{ font-size:12px; color:var(--mut); margin-top:6px; }
+
+  /* toasts */
+  #toasts{ position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:90; display:flex; flex-direction:column; gap:8px; align-items:center; width:min(92vw,440px); pointer-events:none; }
+  .toast{
+    background:rgba(22,50,74,.94); color:#fff; font-size:13.5px; font-weight:600;
+    padding:10px 15px; border-radius:14px; box-shadow:0 6px 18px rgba(10,30,50,.3);
+    animation:toastIn .25s ease; max-width:100%; text-align:center;
+  }
+  @keyframes toastIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+  .net-banner{
+    display:none; background:#fdeeee; color:#b3261e; font-size:12.5px; font-weight:650;
+    text-align:center; padding:7px 10px;
+  }
+  .net-banner.show{ display:block; }
+</style>
+</head>
+<body>
+
+<header id="canto">
+  <div class="brand-row">
+    <div class="brand">PON<small>suas salas, suas pessoas</small></div>
+    <button id="btnSound" type="button" title="som ligado/desligado">🔊</button>
+  </div>
+  <div class="me-row" id="meRow" title="toca pra editar seu perfil">
+    <div class="avatar" id="meAvatar"></div>
+    <div class="me-txt">
+      <div class="me-name"><span id="meNameTxt">Você</span><span class="dot online" id="meDot"></span></div>
+      <div class="me-handle" id="meHandleTxt">@voce</div>
+      <div class="me-frase" id="meFraseTxt"></div>
+    </div>
+  </div>
+  <div class="id-edit" id="idEdit">
+    <div class="row"><label>Nome</label><input id="edName" type="text" maxlength="24" placeholder="como te chamam?"></div>
+    <div class="row"><label>@</label><input id="edHandle" type="text" maxlength="20" placeholder="seu.apelido"></div>
+    <div class="row"><label>Frase</label><input id="edFrase" type="text" maxlength="60" placeholder="sua frase de status…"></div>
+    <div class="btns">
+      <button id="edCancel" type="button">Cancelar</button>
+      <button id="edSave" type="button">Salvar</button>
+    </div>
+  </div>
+  <div class="presence-bar" id="presBar">
+    <button class="pbtn" type="button" data-pres="online"><span class="dot online"></span>Online</button>
+    <button class="pbtn" type="button" data-pres="away"><span class="dot away"></span>Ausente</button>
+    <button class="pbtn" type="button" data-pres="busy"><span class="dot busy"></span>Ocupado</button>
+    <button class="pbtn" type="button" data-pres="invisible"><span class="dot invisible"></span>Invisível</button>
+  </div>
+</header>
+<div class="net-banner" id="netBanner">sem conexão com o servidor — tentando de novo…</div>
+
+<main>
+  <!-- ENTRADA -->
+  <section id="viewHall">
+    <div class="hall-title">Suas salas</div>
+    <div class="birth" id="birthState">
+      <div class="b-emoji">🚪</div>
+      <h2>A PON nasce vazia</h2>
+      <p>Sua primeira sala se completa com um convite: você cria, manda o link, e quem você chamou senta na poltrona ao lado.</p>
+      <button class="big-btn" id="btnBirth" type="button">🚪 Criar minha primeira sala</button>
+    </div>
+    <div id="hall"></div>
+    <div class="join-row">
+      <input id="joinCodeInput" type="text" maxlength="8" placeholder="CÓDIGO DA SALA" autocomplete="off">
+      <button id="btnJoinCode" type="button">Entrar</button>
+    </div>
+    <div class="hall-hint">Tem um convite? Abre o link que a sala aparece.<br>Ou digita o código da sala aqui em cima.</div>
+  </section>
+
+  <!-- SALA -->
+  <section id="viewRoom" style="display:none">
+    <div id="roomWrap">
+      <div class="room-head">
+        <button id="btnHall" type="button">← Salas</button>
+        <div class="rh-name" id="roomName">Sala</div>
+        <button id="btnInvite" type="button">➕ Convidar</button>
+        <button class="rh-btn" id="btnRoomMenu" type="button">⚙️</button>
+      </div>
+      <div class="room" id="roomStage">
+        <div class="sky-win dia" id="skyWin"><span class="astro" id="skyAstro">☀️</span><span class="nuvem" style="left:8px;top:12px">☁️</span></div>
+        <div class="corkboard" id="corkboard" title="mural de 24h"></div>
+        <div class="door-prop" id="doorProp"></div>
+        <div class="plant-prop">🪴</div>
+        <div class="floor"></div>
+        <div class="baseboard"></div>
+        <div class="gshadow" style="left:50%;bottom:44px;width:190px;transform:translateX(-50%)"></div>
+        <div class="rug"></div>
+        <div class="coffee" id="coffeeMachine"></div>
+        <div id="roomChars"></div>
+        <div class="ghost-note" id="ghostNote">👻 você está invisível — espiando pela janela</div>
+      </div>
+      <div class="alone-card" id="aloneCard">
+        <div class="alone-txt">Ninguém por aqui agora.<br>Fixa um recado no mural pra quem chegar depois 📌</div>
+        <button id="btnAloneMural" type="button">Fixar recado</button>
+      </div>
+      <div class="talk-bar">
+        <input id="talkInput" type="text" maxlength="140" placeholder="falar na sala…" autocomplete="off">
+        <button id="btnSay" type="button">Falar</button>
+      </div>
+      <div class="verb-bar">
+        <button class="vbar-btn" id="vbTalk" type="button">💬 falar</button>
+        <button class="vbar-btn" id="vbMural" type="button">📌 mural</button>
+        <button class="vbar-btn" id="vbFoto" type="button">📸 foto</button>
+      </div>
+      <div class="talk-hint" id="talkHint">o que se fala aqui, some — sem histórico. conversa de verdade é na sala, na hora.</div>
+      <div class="law-line">nesta sala tudo dura no máximo um dia: falas minutos, mural e fotos 24h.</div>
+    </div>
+  </section>
+</main>
+
+<div id="sheetWrap"><div class="sheet" id="sheetContent"></div></div>
+<div id="bigSignal"><div class="big-emoji" id="bigEmoji">❤️</div></div>
+<div id="toasts"></div>
+<input type="file" id="photoFile" accept="image/*" style="display:none">
+
+<script>
+'use strict';
+/* ================= PON REAL v1 =================
+   Cliente de arquivo único. Camada de dados atrás de um adaptador:
+   - Real: Supabase (REST + Realtime Presence/Broadcast)
+   - Fake: memória, usado nos testes (window.PON_FAKE = true)
+   Balões, sussurros, sinais e cutucadas vivem SÓ no Broadcast:
+   nunca são gravados no banco. Mural e fotos vão pro banco com
+   expires_at = agora + 24h. */
+var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
+var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
+
+var SPEECH_TTL = 3 * 60 * 1000;        /* linha de fala: 3 min */
+var WHISPER_TTL = 3 * 60 * 60 * 1000;  /* sussurro: 3h (só na memória) */
+var DAY_MS = 24 * 60 * 60 * 1000;
+var PHOTO_CAP = 3;
+var MAX_SEATS = 6;
+var PALETTE = ['#e5484d','#f76b15','#e6a817','#46a758','#3e9bdc','#8e4ec6','#e93d82','#12a594'];
+var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+var PRES_META = {
+  online:   { dot:'online',   label:'Online' },
+  away:     { dot:'away',     label:'Ausente' },
+  busy:     { dot:'busy',     label:'Ocupado' },
+  invisible:{ dot:'invisible',label:'Invisível' },
+  offline:  { dot:'offline',  label:'Fora da sala' }
+};
+var SEAT_SLOTS = [
+  {x:50,y:95},{x:28,y:90},{x:72,y:90},{x:12,y:81},{x:88,y:81},{x:50,y:79}
+];
+
+/* ---------------- utilidades ---------------- */
+function el(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function uuid(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+    var r = Math.random()*16|0, v = c==='x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+function makeCode(){
+  var s = '';
+  for (var i=0;i<6;i++) s += CODE_ALPHABET[Math.floor(Math.random()*CODE_ALPHABET.length)];
+  return s;
+}
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function iniOf(name){ var n = String(name || '?').trim(); return (n.charAt(0) || '?').toUpperCase(); }
+function firstNameOf(name){ return String(name || 'você').trim().split(/\s+/)[0] || 'você'; }
+function cdText(exp){
+  var ms = exp - Date.now();
+  if (ms <= 0) return 'sumindo…';
+  var s = Math.ceil(ms/1000);
+  if (s < 60) return s + 's';
+  var m = Math.floor(s/60);
+  if (m < 60) return m + 'min';
+  var h = Math.floor(m/60);
+  return h + 'h' + String(m%60).padStart(2,'0');
+}
+function relText(ts){
+  var d = Date.now() - ts;
+  if (d < 60*1000) return 'agora';
+  if (d < 60*60*1000) return 'há ' + Math.floor(d/60000) + ' min';
+  if (d < DAY_MS) return 'há ' + Math.floor(d/3600000) + 'h';
+  return 'há ' + Math.floor(d/86400000) + 'd';
+}
+function toast(emoji, html){
+  var t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = (emoji ? esc(emoji) + ' ' : '') + html;
+  el('toasts').appendChild(t);
+  setTimeout(function(){ t.style.opacity = '0'; t.style.transition = 'opacity .4s'; }, 3400);
+  setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 3900);
+}
+
+/* ---------------- identidade local ---------------- */
+var ME_KEY = 'pon-v1';
+var me = (function(){
+  var d = { token: uuid(), name: '', handle: '', frase: '', estado: 'online',
+            color: PALETTE[Math.floor(Math.random()*PALETTE.length)], sound: true };
+  try {
+    var raw = localStorage.getItem(ME_KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      for (var k in d) if (p[k] != null) d[k] = p[k];
+      if (!p.token) d.token = uuid();
+    }
+  } catch(e){}
+  return d;
+})();
+function saveMe(){ try { localStorage.setItem(ME_KEY, JSON.stringify(me)); } catch(e){} }
+saveMe();
+function myHandle(){ return me.handle ? '@' + String(me.handle).replace(/^@+/,'') : '@' + (firstNameOf(me.name || 'voce').toLowerCase()); }
+function myMeta(){
+  return { token: me.token, name: me.name || 'Você', handle: myHandle(), frase: me.frase || '',
+           estado: me.estado, color: me.color, ini: iniOf(me.name || 'V') };
+}
+
+/* ---------------- desenhos (do protótipo) ---------------- */
+function figSVG(ini, color){
+  return '<svg width="42" height="51" viewBox="0 0 40 50" aria-hidden="true">'
+    + '<rect x="9" y="20" width="22" height="25" rx="9" fill="'+color+'"/>'
+    + '<circle cx="20" cy="12" r="9.5" fill="#ffd9b8"/>'
+    + '<path d="M10.5 12 a9.5 9.5 0 0 1 19 0 l0 -3.5 a9.5 8 0 0 0 -19 0 z" fill="#5a4030"/>'
+    + '<circle cx="16.6" cy="12.5" r="1.3" fill="#333"/><circle cx="23.4" cy="12.5" r="1.3" fill="#333"/>'
+    + '<path d="M17 16.5 q3 2 6 0" stroke="#b06a3b" stroke-width="1.4" fill="none" stroke-linecap="round"/>'
+    + '<text x="20" y="37" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" font-family="inherit">'+esc(ini)+'</text>'
+    + '</svg>';
+}
+function chairSVG(cushion){
+  return '<svg class="chair-svg" width="76" height="66" viewBox="0 0 76 66" aria-hidden="true">'
+    + '<rect x="12" y="4" width="52" height="36" rx="13" fill="#b0563a"/>'
+    + '<rect x="17" y="9" width="42" height="26" rx="10" fill="#c06547"/>'
+    + '<rect x="4" y="28" width="15" height="26" rx="7" fill="#96482f"/>'
+    + '<rect x="57" y="28" width="15" height="26" rx="7" fill="#96482f"/>'
+    + '<rect x="13" y="38" width="50" height="13" rx="6" fill="'+cushion+'"/>'
+    + '<rect x="18" y="53" width="6" height="10" fill="#7a3b26"/>'
+    + '<rect x="52" y="53" width="6" height="10" fill="#7a3b26"/>'
+    + '</svg>';
+}
+function coffeeSVG(){
+  return '<span class="steam">~ ~</span>'
+    + '<svg width="88" height="66" viewBox="0 0 88 66" aria-hidden="true">'
+    + '<rect x="15" y="50" width="58" height="5" rx="2.5" fill="#8a5a33"/>'
+    + '<rect x="20" y="55" width="5" height="8" fill="#6e4525"/><rect x="63" y="55" width="5" height="8" fill="#6e4525"/>'
+    + '<rect x="19" y="10" width="50" height="33" rx="7" fill="#3a3f44"/>'
+    + '<rect x="25" y="16" width="38" height="10" rx="3" fill="#22262a"/>'
+    + '<circle cx="31" cy="21" r="2.4" fill="#e5484d"/><circle cx="39" cy="21" r="2.4" fill="#43c72e"/>'
+    + '<rect x="39" y="29" width="10" height="6" rx="2" fill="#9aa2a8"/>'
+    + '<rect x="36" y="36" width="16" height="10" rx="2.5" fill="#ffffff"/>'
+    + '<path d="M52 39 q6 3 0 6" stroke="#ffffff" stroke-width="2.4" fill="none"/>'
+    + '<rect x="27" y="47" width="34" height="3.5" rx="1.8" fill="#22262a"/>'
+    + '</svg>';
+}
+function propFor(estado){
+  if (estado === 'away') return '<span class="prop zzz">💤</span>';
+  if (estado === 'busy') return '<span class="prop laptop">💻</span>';
+  return '<span class="prop phone">📱</span>';
+}
+
+/* ---------------- sons clássicos (WebAudio, sintetizados) ---------------- */
+var SoundFX = (function(){
+  var ctx = null, lastPop = 0;
+  function ensureCtx(){
+    if (!me.sound) return null;
+    try {
+      if (!ctx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    } catch(e){ return null; }
+  }
+  function tone(fA, fB, delay, dur, peak){
+    var c = ensureCtx(); if (!c) return;
+    try {
+      var t0 = c.currentTime + (delay || 0);
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(fA, t0);
+      o.frequency.exponentialRampToValueAtTime(Math.max(40, fB), t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peak || 0.12, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    } catch(e){}
+  }
+  function rattle(){
+    var c = ensureCtx(); if (!c) return;
+    try {
+      for (var i=0;i<5;i++){
+        var t0 = c.currentTime + i*0.07;
+        var len = 0.045, buf = c.createBuffer(1, Math.ceil(c.sampleRate*len), c.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var j=0;j<d.length;j++) d[j] = (Math.random()*2-1) * (1 - j/d.length);
+        var src = c.createBufferSource(); src.buffer = buf;
+        var f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 1.1;
+        var g = c.createGain(); g.gain.value = 0.16;
+        src.connect(f); f.connect(g); g.connect(c.destination);
+        src.start(t0);
+      }
+    } catch(e){}
+  }
+  var CUES = {
+    enter:  function(){ tone(660, 660, 0, 0.09, 0.10); tone(990, 990, 0.09, 0.14, 0.10); },
+    exit:   function(){ tone(880, 587, 0, 0.16, 0.08); },
+    pop:    function(){
+      var n = Date.now(); if (n - lastPop < 4000) return; lastPop = n;
+      tone(520, 180, 0, 0.11, 0.11);
+    },
+    popme:  function(){ tone(460, 170, 0, 0.10, 0.09); },
+    nudge:  function(){ rattle(); },
+    signal: function(){ tone(784, 784, 0, 0.08, 0.09); tone(1047, 1047, 0.07, 0.08, 0.09); tone(1319, 1319, 0.14, 0.15, 0.09); }
+  };
+  return {
+    play: function(name){ if (CUES[name]) CUES[name](); },
+    unlock: function(){ ensureCtx(); },
+    toggle: function(){ me.sound = !me.sound; saveMe(); return me.sound; }
+  };
+})();
+
+/* ================= ADAPTADOR FAKE (testes) ================= */
+function createFakeAdapter(){
+  var store = { rooms: [], members: [], pins: [], photos: [], uploads: [], sent: [] };
+  var seq = 1;
+  var handlers = {};   /* roomId -> {presence, event} */
+  var presenceMap = {}; /* roomId -> [metas] */
+  function rid(){ return 'fake-' + (seq++); }
+  function clone(o){ return JSON.parse(JSON.stringify(o)); }
+  var api = {
+    kind: 'fake', store: store,
+    listMyRooms: function(token){
+      var mine = store.members.filter(function(m){ return m.device_token === token; });
+      var rooms = store.rooms.filter(function(r){
+        return mine.some(function(m){ return m.room_id === r.id; });
+      });
+      return Promise.resolve({ rooms: clone(rooms), members: clone(mine) });
+    },
+    createRoom: function(data){
+      var room = { id: rid(), name: data.name, emoji: data.emoji, color: data.color,
+                   invite_code: data.invite_code, owner_token: data.owner_token,
+                   created_at: new Date().toISOString() };
+      store.rooms.push(room);
+      return Promise.resolve(clone(room));
+    },
+    getRoomByCode: function(code){
+      var r = store.rooms.filter(function(x){ return x.invite_code === String(code).toUpperCase(); })[0];
+      return Promise.resolve(r ? clone(r) : null);
+    },
+    joinRoom: function(roomId, member){
+      var ex = store.members.filter(function(m){ return m.room_id === roomId && m.device_token === member.device_token; })[0];
+      if (ex) return Promise.resolve(clone(ex));
+      var row = Object.assign({ id: rid(), room_id: roomId, created_at: new Date().toISOString() }, member);
+      store.members.push(row);
+      return Promise.resolve(clone(row));
+    },
+    listMembers: function(roomId){
+      return Promise.resolve(clone(store.members.filter(function(m){ return m.room_id === roomId; })));
+    },
+    updateMember: function(roomId, token, patch){
+      store.members.forEach(function(m){
+        if (m.room_id === roomId && m.device_token === token) Object.assign(m, patch);
+      });
+      return Promise.resolve(true);
+    },
+    deleteMember: function(roomId, token){
+      store.members = store.members.filter(function(m){ return !(m.room_id === roomId && m.device_token === token); });
+      return Promise.resolve(true);
+    },
+    deleteRoom: function(roomId){
+      store.rooms = store.rooms.filter(function(r){ return r.id !== roomId; });
+      store.members = store.members.filter(function(m){ return m.room_id !== roomId; });
+      store.pins = store.pins.filter(function(p){ return p.room_id !== roomId; });
+      store.photos = store.photos.filter(function(p){ return p.room_id !== roomId; });
+      return Promise.resolve(true);
+    },
+    listPins: function(roomId){
+      return Promise.resolve(clone(store.pins.filter(function(p){ return p.room_id === roomId; })));
+    },
+    addPin: function(pin){
+      var row = Object.assign({ id: rid(), created_at: new Date().toISOString() }, pin);
+      store.pins.push(row);
+      return Promise.resolve(clone(row));
+    },
+    deletePin: function(id){
+      store.pins = store.pins.filter(function(p){ return p.id !== id; });
+      return Promise.resolve(true);
+    },
+    listPhotos: function(roomId){
+      return Promise.resolve(clone(store.photos.filter(function(p){ return p.room_id === roomId; })));
+    },
+    addPhoto: function(ph){
+      var row = Object.assign({ id: rid(), created_at: new Date().toISOString() }, ph);
+      store.photos.push(row);
+      return Promise.resolve(clone(row));
+    },
+    deletePhoto: function(id){
+      store.photos = store.photos.filter(function(p){ return p.id !== id; });
+      return Promise.resolve(true);
+    },
+    uploadPhoto: function(roomId, token, blob){
+      var path = roomId + '/' + token + '-' + Date.now() + '.jpg';
+      store.uploads.push({ room_id: roomId, path: path, size: blob && blob.size ? blob.size : 0 });
+      return Promise.resolve({ url: 'fake://photos/' + path, path: path });
+    },
+    subscribeRoom: function(roomId, cbs){ handlers[roomId] = cbs; return Promise.resolve(true); },
+    unsubscribeRoom: function(roomId){ delete handlers[roomId]; return Promise.resolve(true); },
+    track: function(roomId, meta){
+      var list = presenceMap[roomId] || [];
+      list = list.filter(function(m){ return m.token !== meta.token; });
+      list.push(Object.assign({}, meta));
+      presenceMap[roomId] = list;
+      if (handlers[roomId]) handlers[roomId].presence(list.slice());
+      return Promise.resolve(true);
+    },
+    untrack: function(roomId, token){
+      var list = (presenceMap[roomId] || []).filter(function(m){ return m.token !== token; });
+      presenceMap[roomId] = list;
+      if (handlers[roomId]) handlers[roomId].presence(list.slice());
+      return Promise.resolve(true);
+    },
+    broadcast: function(roomId, event, payload){
+      store.sent.push({ room_id: roomId, event: event, payload: clone(payload || {}) });
+      return Promise.resolve(true);
+    },
+    /* ganchos de teste: simulam OUTRO aparelho */
+    __setPresence: function(roomId, metas){
+      presenceMap[roomId] = metas.slice();
+      if (handlers[roomId]) handlers[roomId].presence(metas.slice());
+    },
+    __emit: function(roomId, event, payload){
+      if (handlers[roomId]) handlers[roomId].event(event, payload || {});
+    },
+    __presence: function(roomId){ return (presenceMap[roomId] || []).slice(); }
+  };
+  return api;
+}
+
+/* ================= ADAPTADOR REAL (Supabase) ================= */
+function createRealAdapter(){
+  var sb = window.supabase.createClient(SB_URL, SB_KEY, {
+    global: { headers: { 'x-device-token': me.token } },
+    realtime: { params: { eventsPerSecond: 10 } }
+  });
+  var channels = {}; /* roomId -> {ch, cbs, tracked} */
+  function chState(roomId){
+    if (!channels[roomId]) channels[roomId] = { ch: null, cbs: null, tracked: false, ready: null };
+    return channels[roomId];
+  }
+  function ensureChannel(roomId){
+    var st = chState(roomId);
+    if (st.ch) return st;
+    var ch = sb.channel('room:' + roomId, {
+      config: { broadcast: { self: false }, presence: { key: me.token } }
+    });
+    ch.on('presence', { event: 'sync' }, function(){
+      if (!st.cbs) return;
+      var flat = [];
+      var state = ch.presenceState();
+      Object.keys(state).forEach(function(k){
+        state[k].forEach(function(m){ flat.push(m); });
+      });
+      st.cbs.presence(flat);
+    });
+    ch.on('broadcast', { event: 'pon' }, function(msg){
+      if (st.cbs && msg && msg.payload) st.cbs.event(msg.payload.type, msg.payload);
+    });
+    st.ready = new Promise(function(res){
+      ch.subscribe(function(status){ if (status === 'SUBSCRIBED') res(true); });
+    });
+    st.ch = ch;
+    return st;
+  }
+  function rows(p){ return p.then(function(r){
+    if (r.error) throw r.error;
+    return r.data;
+  }); }
+  return {
+    kind: 'real',
+    listMyRooms: function(token){
+      return rows(sb.from('members').select('*').eq('device_token', token)).then(function(mine){
+        if (!mine.length) return { rooms: [], members: [] };
+        var ids = mine.map(function(m){ return m.room_id; });
+        return rows(sb.from('rooms').select('*').in('id', ids)).then(function(rooms){
+          return { rooms: rooms || [], members: mine };
+        });
+      });
+    },
+    createRoom: function(data){
+      return rows(sb.from('rooms').insert(data).select().single());
+    },
+    getRoomByCode: function(code){
+      return rows(sb.from('rooms').select('*').eq('invite_code', String(code).toUpperCase()).maybeSingle());
+    },
+    joinRoom: function(roomId, member){
+      return rows(sb.from('members')
+        .upsert(Object.assign({ room_id: roomId }, member), { onConflict: 'room_id,device_token' })
+        .select().single());
+    },
+    listMembers: function(roomId){
+      return rows(sb.from('members').select('*').eq('room_id', roomId).order('created_at', { ascending: true }))
+        .then(function(d){ return d || []; });
+    },
+    updateMember: function(roomId, token, patch){
+      return rows(sb.from('members').update(patch).eq('room_id', roomId).eq('device_token', token)).then(function(){ return true; });
+    },
+    deleteMember: function(roomId, token){
+      return rows(sb.from('members').delete().eq('room_id', roomId).eq('device_token', token)).then(function(){ return true; });
+    },
+    deleteRoom: function(roomId){
+      return rows(sb.from('rooms').delete().eq('id', roomId)).then(function(){ return true; });
+    },
+    listPins: function(roomId){
+      return rows(sb.from('pins').select('*').eq('room_id', roomId).order('created_at', { ascending: false }))
+        .then(function(d){ return d || []; });
+    },
+    addPin: function(pin){
+      return rows(sb.from('pins').insert(pin).select().single());
+    },
+    deletePin: function(id){
+      return rows(sb.from('pins').delete().eq('id', id)).then(function(){ return true; });
+    },
+    listPhotos: function(roomId){
+      return rows(sb.from('photos').select('*').eq('room_id', roomId).order('created_at', { ascending: false }))
+        .then(function(d){ return d || []; });
+    },
+    addPhoto: function(ph){
+      return rows(sb.from('photos').insert(ph).select().single());
+    },
+    deletePhoto: function(id){
+      return rows(sb.from('photos').delete().eq('id', id)).then(function(){ return true; });
+    },
+    uploadPhoto: function(roomId, token, blob){
+      var path = roomId + '/' + token + '-' + Date.now() + '.jpg';
+      return sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
+        .then(function(r){
+          if (r.error) throw r.error;
+          var pub = sb.storage.from('photos').getPublicUrl(path);
+          return { url: pub.data.publicUrl, path: path };
+        });
+    },
+    subscribeRoom: function(roomId, cbs){
+      var st = ensureChannel(roomId);
+      st.cbs = cbs;
+      return st.ready;
+    },
+    unsubscribeRoom: function(roomId){
+      var st = channels[roomId];
+      if (st && st.ch) sb.removeChannel(st.ch);
+      delete channels[roomId];
+      return Promise.resolve(true);
+    },
+    track: function(roomId, meta){
+      var st = ensureChannel(roomId);
+      return st.ready.then(function(){ st.tracked = true; return st.ch.track(meta); });
+    },
+    untrack: function(roomId){
+      var st = channels[roomId];
+      if (st && st.ch && st.tracked) { st.tracked = false; return st.ch.untrack(); }
+      return Promise.resolve(true);
+    },
+    broadcast: function(roomId, type, payload){
+      var st = ensureChannel(roomId);
+      var msg = Object.assign({ type: type }, payload || {});
+      return st.ready.then(function(){
+        return st.ch.send({ type: 'broadcast', event: 'pon', payload: msg });
+      });
+    }
+  };
+}
+
+/* ================= ESTADO ================= */
+var DB = null;
+var S = {
+  rooms: [],            /* minhas salas (linhas de rooms) */
+  myMembers: {},        /* roomId -> minha linha em members */
+  members: {},          /* roomId -> [members] */
+  presence: {},         /* roomId -> { token: meta } */
+  pins: {},             /* roomId -> [pins] (já filtrados) */
+  photos: {},           /* roomId -> [photos] (já filtrados) */
+  speech: {},           /* roomId -> { token: {lines:[{text,exp}], lastAt} } */
+  whispers: {},         /* roomId -> { outroToken: {text, exp, fromMe} } */
+  stageForce: {},       /* roomId -> token forçado ao palco */
+  seats: {},            /* roomId -> { token: {x,y} } */
+  lastTalkAt: {},       /* roomId -> ts da última fala (qualquer um) */
+  bursts: {},           /* roomId -> { token: {emoji, until} } */
+  currentRoom: null,
+  booted: false
+};
+function roomById(id){ for (var i=0;i<S.rooms.length;i++) if (S.rooms[i].id === id) return S.rooms[i]; return null; }
+function isOwner(room){ return room && room.owner_token === me.token; }
+function memberOf(roomId, token){
+  var list = S.members[roomId] || [];
+  for (var i=0;i<list.length;i++) if (list[i].device_token === token) return list[i];
+  return null;
+}
+function personDisplay(roomId, token){
+  if (token === me.token) return myMeta();
+  var pres = (S.presence[roomId] || {})[token];
+  var mem = memberOf(roomId, token);
+  var base = mem || {};
+  var p = pres || {};
+  return {
+    token: token,
+    name: p.name || base.name || 'Alguém',
+    handle: p.handle || base.handle || '',
+    frase: p.frase != null ? p.frase : (base.frase || ''),
+    estado: pres ? (p.estado || 'online') : 'offline',
+    color: p.color || base.color || '#888',
+    ini: iniOf(p.name || base.name || '?')
+  };
+}
+function presentTokens(roomId){
+  var pres = S.presence[roomId] || {};
+  return Object.keys(pres).filter(function(t){ return pres[t] && pres[t].estado !== 'invisible' || t === me.token; });
+}
+function isPresent(roomId, token){
+  if (token === me.token) return S.currentRoom === roomId && me.estado !== 'invisible' ? true : (S.currentRoom === roomId);
+  var p = (S.presence[roomId] || {})[token];
+  return !!p;
+}
+function seatPos(roomId, token, idx){
+  var sm = S.seats[roomId] || {};
+  if (sm[token]) return sm[token];
+  var slot = SEAT_SLOTS[idx % SEAT_SLOTS.length];
+  return { x: slot.x, y: slot.y };
+}
+function inviteLink(room){
+  return location.origin + location.pathname + '#c/' + room.invite_code;
+}
+
+/* ================= TEMPO REAL ================= */
+function wireRoom(roomId){
+  DB.subscribeRoom(roomId, {
+    presence: function(metas){ onPresence(roomId, metas); },
+    event: function(type, payload){ onEvent(roomId, type, payload); }
+  });
+}
+function onPresence(roomId, metas){
+  var before = S.presence[roomId] || {};
+  var nowMap = {};
+  metas.forEach(function(m){ if (m && m.token) nowMap[m.token] = m; });
+  S.presence[roomId] = nowMap;
+  /* entradas e saídas (sons só na sala aberta) */
+  Object.keys(nowMap).forEach(function(t){
+    if (!before[t] && t !== me.token && S.currentRoom === roomId){
+      SoundFX.play('enter');
+      flashDoor();
+      var d = personDisplay(roomId, t);
+      toast('🔔', '<b>' + esc(d.name) + '</b> acabou de entrar na sala');
+    }
+  });
+  Object.keys(before).forEach(function(t){
+    if (!nowMap[t] && t !== me.token && S.currentRoom === roomId) SoundFX.play('exit');
+  });
+  if (S.currentRoom === roomId) renderRoom();
+  renderHall();
+}
+function onEvent(roomId, type, p){
+  if (!p || p.from === me.token) return;
+  var room = roomById(roomId);
+  if (type === 'say'){
+    pushSpeech(roomId, p.from, p.text, false);
+    S.lastTalkAt[roomId] = Date.now();
+    if (S.currentRoom === roomId){ SoundFX.play('pop'); }
+  } else if (type === 'whisper'){
+    if (p.to === me.token){
+      (S.whispers[roomId] = S.whispers[roomId] || {})[p.from] = { text: p.text, exp: Date.now() + WHISPER_TTL, fromMe: false };
+      if (S.currentRoom === roomId){ SoundFX.play('pop'); toast('🤫', '<b>' + esc(p.name || 'Alguém') + '</b> sussurrou pra você'); }
+    }
+  } else if (type === 'signal'){
+    (S.bursts[roomId] = S.bursts[roomId] || {})[p.from] = { emoji: p.emoji, until: Date.now() + 1500 };
+    if (S.currentRoom === roomId){ showBigSignal(p.emoji); SoundFX.play('signal'); }
+  } else if (type === 'nudge'){
+    if (p.to === me.token && S.currentRoom === roomId){
+      SoundFX.play('nudge');
+      try { if (navigator.vibrate) navigator.vibrate(180); } catch(e){}
+      var stage = el('roomStage');
+      stage.classList.remove('shaking'); void stage.offsetWidth; stage.classList.add('shaking');
+      shakeChar(me.token);
+      toast('👋', '<b>' + esc(p.name || 'Alguém') + '</b> chamou sua atenção');
+    }
+  } else if (type === 'seat'){
+    (S.seats[roomId] = S.seats[roomId] || {})[p.from] = { x: p.x, y: p.y };
+  } else if (type === 'meta'){
+    var mem = memberOf(roomId, p.from);
+    if (mem){ mem.name = p.name; mem.handle = p.handle; mem.frase = p.frase; mem.estado = p.estado; mem.color = p.color; }
+  } else if (type === 'pins'){
+    refreshPins(roomId);
+  } else if (type === 'photos'){
+    refreshPhotos(roomId);
+  } else if (type === 'kicked'){
+    if (p.to === me.token){
+      toast('🚪', 'Você foi removido da sala <b>' + esc(room ? room.name : '') + '</b>');
+      removeRoomLocal(roomId);
+    } else {
+      refreshMembers(roomId);
+    }
+  } else if (type === 'roomdel'){
+    toast('🚪', 'A sala <b>' + esc(room ? room.name : '') + '</b> foi apagada');
+    removeRoomLocal(roomId);
+  } else if (type === 'joined'){
+    refreshMembers(roomId);
+  }
+  if (S.currentRoom === roomId && type !== 'meta') renderRoom();
+  if (type === 'say' || type === 'joined') renderHall();
+}
+function removeRoomLocal(roomId){
+  DB.unsubscribeRoom(roomId);
+  S.rooms = S.rooms.filter(function(r){ return r.id !== roomId; });
+  delete S.myMembers[roomId]; delete S.members[roomId]; delete S.presence[roomId];
+  delete S.pins[roomId]; delete S.photos[roomId]; delete S.speech[roomId];
+  if (S.currentRoom === roomId){ S.currentRoom = null; showHall(); }
+  renderHall();
+}
+function refreshMembers(roomId){
+  return DB.listMembers(roomId).then(function(list){
+    S.members[roomId] = list;
+    list.forEach(function(m){
+      if (m.seat_x != null && m.seat_y != null)
+        (S.seats[roomId] = S.seats[roomId] || {})[m.device_token] = { x: +m.seat_x, y: +m.seat_y };
+    });
+    if (S.currentRoom === roomId) renderRoom();
+    renderHall();
+  }).catch(function(){});
+}
+function refreshPins(roomId){
+  return DB.listPins(roomId).then(function(list){
+    var now = Date.now();
+    S.pins[roomId] = list.filter(function(p){ return new Date(p.expires_at).getTime() > now; });
+    /* limpa os MEUS recados expirados */
+    list.forEach(function(p){
+      if (new Date(p.expires_at).getTime() <= now && p.author_token === me.token) DB.deletePin(p.id).catch(function(){});
+    });
+    if (S.currentRoom === roomId) renderCorkboard();
+  }).catch(function(){});
+}
+function refreshPhotos(roomId){
+  return DB.listPhotos(roomId).then(function(list){
+    var now = Date.now();
+    S.photos[roomId] = list.filter(function(p){ return new Date(p.expires_at).getTime() > now; });
+    list.forEach(function(p){
+      if (new Date(p.expires_at).getTime() <= now && p.author_token === me.token) DB.deletePhoto(p.id).catch(function(){});
+    });
+  }).catch(function(){});
+}
+function trackMe(roomId){
+  if (me.estado === 'invisible') return DB.untrack(roomId, me.token);
+  return DB.track(roomId, myMeta());
+}
+
+/* ================= FALA (efêmera) ================= */
+function pushSpeech(roomId, token, text, mine){
+  var map = (S.speech[roomId] = S.speech[roomId] || {});
+  var sp = map[token] || (map[token] = { lines: [], lastAt: 0 });
+  sp.lines.push({ text: String(text || '').slice(0, 140), exp: Date.now() + SPEECH_TTL });
+  while (sp.lines.length > 3) sp.lines.shift();
+  sp.lastAt = Date.now();
+}
+function liveSpeakers(roomId){
+  var map = S.speech[roomId] || {};
+  return Object.keys(map).filter(function(t){
+    return map[t].lines.some(function(l){ return l.exp > Date.now(); });
+  });
+}
+function computeStage(roomId){
+  var others = liveSpeakers(roomId).filter(function(t){ return t !== me.token; });
+  var map = S.speech[roomId] || {};
+  others.sort(function(a,b){ return (map[b].lastAt || 0) - (map[a].lastAt || 0); });
+  var stage = others.slice(0, 3);
+  var forced = S.stageForce[roomId];
+  if (forced && others.indexOf(forced) >= 0 && stage.indexOf(forced) < 0){
+    stage[stage.length - 1] = forced;
+  }
+  return stage;
+}
+function pruneEphemeral(){
+  var now = Date.now(), changed = false;
+  Object.keys(S.speech).forEach(function(rid){
+    var map = S.speech[rid];
+    Object.keys(map).forEach(function(t){
+      var before = map[t].lines.length;
+      map[t].lines = map[t].lines.filter(function(l){ return l.exp > now; });
+      if (map[t].lines.length !== before) changed = true;
+      if (!map[t].lines.length) delete map[t];
+    });
+  });
+  Object.keys(S.whispers).forEach(function(rid){
+    var wm = S.whispers[rid];
+    Object.keys(wm).forEach(function(t){
+      if (wm[t].exp <= now){ delete wm[t]; changed = true; }
+    });
+  });
+  Object.keys(S.bursts).forEach(function(rid){
+    var bm = S.bursts[rid];
+    Object.keys(bm).forEach(function(t){ if (bm[t].until <= now) delete bm[t]; });
+  });
+  return changed;
+}
+
+/* ================= RENDER: MEU CANTO ================= */
+function renderCanto(){
+  el('meAvatar').innerHTML = figSVG(me.ini || iniOf(me.name || 'V'), me.color);
+  el('meAvatar').style.background = me.color;
+  el('meNameTxt').textContent = me.name || 'Você';
+  el('meHandleTxt').textContent = myHandle();
+  el('meFraseTxt').textContent = me.frase || 'toca aqui pra escrever sua frase ✏️';
+  var dot = el('meDot');
+  dot.className = 'dot ' + (PRES_META[me.estado] || PRES_META.online).dot + (me.estado === 'online' ? ' pulse-c' : '');
+  var btns = el('presBar').querySelectorAll('.pbtn');
+  for (var i=0;i<btns.length;i++) btns[i].classList.toggle('sel', btns[i].getAttribute('data-pres') === me.estado);
+  el('btnSound').textContent = me.sound ? '🔊' : '🔇';
+}
+
+/* ================= RENDER: ENTRADA ================= */
+function doorStatus(roomId){
+  var pres = S.presence[roomId] || {};
+  var inside = Object.keys(pres).length;
+  var speakers = liveSpeakers(roomId).length;
+  if (speakers && inside) return { talking: true, text: '💬 conversa agora' };
+  if (S.lastTalkAt[roomId]) return { talking: false, text: 'última fala ' + relText(S.lastTalkAt[roomId]) };
+  if (inside) return { talking: false, text: inside === 1 ? '1 pessoa dentro agora' : inside + ' pessoas dentro agora' };
+  return { talking: false, text: 'silêncio por aqui' };
+}
+function renderHall(){
+  var hall = el('hall');
+  var birth = el('birthState');
+  birth.classList.toggle('show', S.rooms.length === 0);
+  var h = '';
+  S.rooms.forEach(function(room){
+    var members = S.members[room.id] || [];
+    var pres = S.presence[room.id] || {};
+    var st = doorStatus(room.id);
+    var faces = members.slice(0, MAX_SEATS).map(function(m){
+      var d = personDisplay(room.id, m.device_token);
+      var inp = !!pres[m.device_token];
+      return '<span class="mini-face' + (inp ? '' : ' absent') + '" style="background:' + esc(d.color) + '" title="' + esc(d.name) + '">'
+        + esc(d.ini) + '<span class="dot ' + esc((PRES_META[d.estado] || PRES_META.offline).dot) + '"></span></span>';
+    }).join('');
+    var names = members.map(function(m){ return esc(personDisplay(room.id, m.device_token).name); }).join(', ');
+    h += '<div class="door-card' + (st.talking ? ' talking' : '') + '" data-room="' + room.id + '">'
+      + '<div class="door-ico" style="border:2px solid ' + esc(room.color || '#d9b98c') + '">' + esc(room.emoji || '🚪') + '</div>'
+      + '<div class="door-main"><div class="door-name">' + esc(room.name) + '</div>'
+      + '<div class="door-who">' + (names || 'só você, por enquanto') + '</div>'
+      + '<div class="door-faces">' + faces + '</div>'
+      + '<span class="door-talk">' + esc(st.text) + '</span></div></div>';
+  });
+  h += '<div class="door-card create" id="doorCreate">'
+    + '<div class="door-ico">➕</div>'
+    + '<div class="door-main"><div class="door-name">Nova sala</div>'
+    + '<div class="door-who">cria um cantinho e convida quem você quiser</div></div></div>';
+  hall.innerHTML = h;
+  var cards = hall.querySelectorAll('.door-card[data-room]');
+  for (var i=0;i<cards.length;i++){
+    cards[i].addEventListener('click', function(){ enterRoom(this.getAttribute('data-room')); });
+  }
+  el('doorCreate').addEventListener('click', openCreateSheet);
+}
+
+/* ================= RENDER: SALA ================= */
+function showHall(){
+  el('viewRoom').style.display = 'none';
+  el('viewHall').style.display = '';
+  renderHall();
+}
+function enterRoom(roomId){
+  var room = roomById(roomId);
+  if (!room) return;
+  SoundFX.unlock();
+  if (S.currentRoom && S.currentRoom !== roomId) DB.untrack(S.currentRoom, me.token);
+  S.currentRoom = roomId;
+  el('viewHall').style.display = 'none';
+  el('viewRoom').style.display = '';
+  el('roomName').textContent = (room.emoji || '🚪') + ' ' + room.name;
+  trackMe(roomId);
+  refreshMembers(roomId);
+  refreshPins(roomId);
+  refreshPhotos(roomId);
+  renderRoom();
+  updateSky();
+  setTimeout(function(){ focusOn(me.token); }, 60);
+}
+function leaveToHall(){
+  if (S.currentRoom) DB.untrack(S.currentRoom, me.token);
+  S.currentRoom = null;
+  closeSheet();
+  showHall();
+}
+function updateSky(){
+  var h = new Date().getHours();
+  var win = el('skyWin'), astro = el('skyAstro');
+  var cls = (h >= 6 && h < 16) ? 'dia' : (h >= 16 && h < 19) ? 'tarde' : 'noite';
+  win.className = 'sky-win ' + cls;
+  astro.textContent = cls === 'dia' ? '☀️' : cls === 'tarde' ? '🌇' : '🌙';
+}
+function flashDoor(){
+  var d = el('doorProp');
+  d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash');
+}
+function renderCorkboard(){
+  var roomId = S.currentRoom; if (!roomId) return;
+  var act = S.pins[roomId] || [];
+  var h = '<div class="cb-title">📌 mural · 24h</div>';
+  if (!act.length) h += '<div class="cb-empty">vazio — fixa um recado pra quem não está</div>';
+  h += '<div class="cb-notes">';
+  act.slice(0, 2).forEach(function(p){ h += '<span class="cb-sticky">' + esc(p.texto) + '</span>'; });
+  h += '<span class="cb-sticky cb-fix" id="cbFix">✏️ fixar recado</span></div>';
+  el('corkboard').innerHTML = h;
+  el('cbFix').addEventListener('click', function(ev){ ev.stopPropagation(); openMuralSheet(); });
+}
+function balloonDims(lines){
+  var maxLen = 0;
+  lines.forEach(function(l){ maxLen = Math.max(maxLen, l.text.length); });
+  var w = clamp(34 + maxLen * 6.4, 60, 150);
+  var linesWrapped = lines.reduce(function(acc, l){ return acc + Math.max(1, Math.ceil(l.text.length / 24)); }, 0);
+  var hgt = linesWrapped * 16 + lines.length * 4 + 22;
+  return { w: w, h: hgt };
+}
+function balloonHtml(roomId, token){
+  var sp = (S.speech[roomId] || {})[token];
+  if (!sp || !sp.lines.length) return '';
+  var lines = sp.lines.filter(function(l){ return l.exp > Date.now(); });
+  if (!lines.length) return '';
+  var minExp = Math.min.apply(null, lines.map(function(l){ return l.exp; }));
+  var inner = lines.map(function(l){ return '<div>' + esc(l.text) + '</div>'; }).join('');
+  return '<div class="balloon' + (token === me.token ? ' mine' : '') + '" data-lines="' + lines.length + '">'
+    + inner + '<span class="cd">⏳ ' + cdText(minExp) + '</span></div>';
+}
+function whisperHtml(roomId, token){
+  var wm = S.whispers[roomId] || {};
+  var w = wm[token];
+  if (!w || w.exp <= Date.now()) return '';
+  return '<div class="whisper-bal' + (w.fromMe ? ' mine' : '') + '">🤫 ' + esc(w.text)
+    + '<span class="cd">sussurro · ' + cdText(w.exp) + '</span></div>';
+}
+function charHtml(roomId, token, idx){
+  var d = personDisplay(roomId, token);
+  var present = isPresent(roomId, token);
+  var ghostMe = token === me.token && me.estado === 'invisible';
+  var pos = seatPos(roomId, token, idx);
+  var stage = computeStage(roomId);
+  var onStage = stage.indexOf(token) >= 0;
+  var speaking = liveSpeakers(roomId).indexOf(token) >= 0;
+  var burst = (S.bursts[roomId] || {})[token];
+  var bal = '';
+  if (present && !ghostMe){
+    bal += whisperHtml(roomId, token);
+    if (speaking && (token === me.token || onStage)) bal += balloonHtml(roomId, token);
+  }
+  var chip = (present && speaking && token !== me.token && !onStage)
+    ? '<span class="talk-chip" data-chip="' + esc(token) + '">💬</span>' : '';
+  var inner;
+  if (!present || ghostMe){
+    inner = '<div class="bal-col"></div>'
+      + '<div class="seatwrap">' + chairSVG(d.color) + '<span class="jacket">🧥</span></div>'
+      + '<div class="fora-name">' + esc(d.name) + ' · fora</div>';
+  } else {
+    inner = '<div class="bal-col">' + bal + '</div>'
+      + chip
+      + '<div class="seatwrap">' + chairSVG(d.color)
+      + '<div class="fig">' + figSVG(d.ini, d.color) + propFor(d.estado) + '</div></div>'
+      + (burst && burst.until > Date.now() ? '<div class="sig-burst">' + esc(burst.emoji) + '</div>' : '')
+      + '<div class="under-name"><span class="dot ' + esc((PRES_META[d.estado] || PRES_META.online).dot) + '"></span>' + esc(d.name) + '</div>';
+  }
+  return '<div class="char' + (present && !ghostMe ? '' : ' fora') + '" data-token="' + esc(token) + '" '
+    + 'style="left:' + pos.x + '%;top:' + pos.y + '%">'
+    + '<div class="char-shadow"></div><div class="char-inner">' + inner + '</div></div>';
+}
+function renderRoom(){
+  var roomId = S.currentRoom; if (!roomId) return;
+  var room = roomById(roomId);
+  var members = (S.members[roomId] || []).slice();
+  /* eu sempre tenho cadeira */
+  if (!members.some(function(m){ return m.device_token === me.token; }) && S.myMembers[roomId])
+    members.unshift(S.myMembers[roomId]);
+  members.sort(function(a,b){ return String(a.created_at).localeCompare(String(b.created_at)); });
+  el('roomChars').innerHTML = members.slice(0, MAX_SEATS).map(function(m, i){
+    return charHtml(roomId, m.device_token, i);
+  }).join('');
+  el('coffeeMachine').innerHTML = coffeeSVG();
+  renderCorkboard();
+  var others = members.filter(function(m){ return m.device_token !== me.token; });
+  var anyoneElseIn = others.some(function(m){ return isPresent(roomId, m.device_token); });
+  el('aloneCard').classList.toggle('show', !anyoneElseIn);
+  el('ghostNote').classList.toggle('show', me.estado === 'invisible');
+  /* bind: toque abre painel; arrastar move a poltrona */
+  var nodes = el('roomChars').querySelectorAll('.char');
+  for (var i=0;i<nodes.length;i++) bindChar(nodes[i], roomId, members);
+  var chips = el('roomChars').querySelectorAll('.talk-chip');
+  for (var j=0;j<chips.length;j++){
+    chips[j].addEventListener('click', function(ev){
+      ev.stopPropagation();
+      S.stageForce[roomId] = this.getAttribute('data-chip');
+      renderRoom();
+    });
+  }
+  layoutBalloons(roomId, members);
+}
+function layoutBalloons(roomId, members){
+  var stage = el('roomStage');
+  var W = stage.clientWidth || 400, H = stage.clientHeight || 392;
+  var placed = [];
+  var nodes = el('roomChars').querySelectorAll('.char');
+  for (var i=0;i<nodes.length;i++){
+    var node = nodes[i];
+    var col = node.querySelector('.bal-col');
+    if (!col) continue;
+    col.style.transform = '';
+    var bal = node.querySelector('.balloon');
+    if (!bal) continue;
+    var token = node.getAttribute('data-token');
+    var idx = 0;
+    members.forEach(function(m, k){ if (m.device_token === token) idx = k; });
+    var pos = seatPos(roomId, token, idx);
+    var sp = (S.speech[roomId] || {})[token];
+    var lines = sp ? sp.lines.filter(function(l){ return l.exp > Date.now(); }) : [];
+    var dim = balloonDims(lines.length ? lines : [{ text: '' }]);
+    var cx = pos.x / 100 * W;
+    var charTopY = pos.y / 100 * H - 118;
+    var box = { l: cx - dim.w/2, r: cx + dim.w/2, t: charTopY - dim.h, b: charTopY };
+    var lift = 0, guard = 0;
+    function hits(b){
+      return placed.some(function(p){ return b.l < p.r - 2 && b.r > p.l + 2 && b.t < p.b - 2 && b.b > p.t + 2; });
+    }
+    while (hits(box) && guard < 12){
+      lift += 14; box.t -= 14; box.b -= 14; guard++;
+    }
+    if (lift) col.style.transform = 'translateY(' + (-lift) + 'px)';
+    placed.push(box);
+  }
+}
+function shakeChar(token){
+  var node = el('roomChars').querySelector('.char[data-token="' + token + '"]');
+  if (node){ node.classList.remove('shake'); void node.offsetWidth; node.classList.add('shake'); }
+}
+function focusOn(token){
+  var node = el('roomChars').querySelector('.char[data-token="' + token + '"]');
+  if (node && node.scrollIntoView) {
+    try { node.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){ node.scrollIntoView(); }
+  }
+}
+function showBigSignal(emoji){
+  var w = el('bigSignal'), b = el('bigEmoji');
+  b.textContent = emoji;
+  w.classList.remove('show'); void w.offsetWidth; w.classList.add('show');
+  setTimeout(function(){ w.classList.remove('show'); }, 1550);
+}
+
+/* ================= ARRASTAR POLTRONA ================= */
+function bindChar(node, roomId, members){
+  var token = node.getAttribute('data-token');
+  var startX = 0, startY = 0, moved = false, pid = null;
+  node.addEventListener('pointerdown', function(ev){
+    pid = ev.pointerId; moved = false;
+    startX = ev.clientX; startY = ev.clientY;
+    node.classList.add('dragging');
+    try { node.setPointerCapture(pid); } catch(e){}
+  });
+  node.addEventListener('pointermove', function(ev){
+    if (pid === null || ev.pointerId !== pid) return;
+    var dx = ev.clientX - startX, dy = ev.clientY - startY;
+    if (Math.abs(dx) + Math.abs(dy) > 7) moved = true;
+    if (!moved) return;
+    var stage = el('roomStage').getBoundingClientRect();
+    var x = clamp((ev.clientX - stage.left) / stage.width * 100, 9, 91);
+    var y = clamp((ev.clientY - stage.top) / stage.height * 100 + 6, 55, 98);
+    node.style.left = x + '%'; node.style.top = y + '%';
+    node.setAttribute('data-dx', x); node.setAttribute('data-dy', y);
+  });
+  function finish(ev, cancelled){
+    if (pid === null) return;
+    node.classList.remove('dragging');
+    var wasDrag = moved && !cancelled;
+    pid = null;
+    if (wasDrag){
+      var x = parseFloat(node.getAttribute('data-dx')), y = parseFloat(node.getAttribute('data-dy'));
+      if (!isNaN(x) && !isNaN(y)){
+        (S.seats[roomId] = S.seats[roomId] || {})[token] = { x: Math.round(x), y: Math.round(y) };
+        if (token === me.token){
+          DB.updateMember(roomId, me.token, { seat_x: Math.round(x), seat_y: Math.round(y) }).catch(function(){});
+          DB.broadcast(roomId, 'seat', { from: me.token, x: Math.round(x), y: Math.round(y) });
+        } else {
+          /* arrastar o outro = a cutucada com as mãos: ele treme e a poltrona volta */
+          DB.broadcast(roomId, 'nudge', { from: me.token, to: token, name: me.name });
+          setTimeout(function(){ renderRoom(); }, 650);
+        }
+      }
+      renderRoom();
+    } else {
+      openPersonSheet(roomId, token);
+    }
+  }
+  node.addEventListener('pointerup', function(ev){ finish(ev, false); });
+  node.addEventListener('pointercancel', function(ev){ finish(ev, true); });
+}
+
+/* ================= PAINÉIS ================= */
+function openSheet(html){
+  el('sheetContent').innerHTML = html;
+  el('sheetWrap').classList.add('open');
+}
+function closeSheet(){ el('sheetWrap').classList.remove('open'); }
+el('sheetWrap').addEventListener('click', function(ev){ if (ev.target === this) closeSheet(); });
+function sheetCloseBtn(){ return '<button class="sheet-close" id="shClose" type="button">fechar</button>'; }
+function bindClose(){ var b = el('shClose'); if (b) b.addEventListener('click', closeSheet); }
+
+function openPersonSheet(roomId, token){
+  var room = roomById(roomId); if (!room) return;
+  var d = personDisplay(roomId, token);
+  var mine = token === me.token;
+  var present = isPresent(roomId, token);
+  var pm = PRES_META[d.estado] || PRES_META.offline;
+  var wSlot = (S.whispers[roomId] || {})[token];
+  var theirWhisper = (wSlot && !wSlot.fromMe) ? wSlot : null;
+  var myPinsOut = (wSlot && wSlot.fromMe) ? wSlot : null;
+  var photos = (S.photos[roomId] || []).filter(function(p){ return p.author_token === token; });
+  var myCount = (S.photos[roomId] || []).filter(function(p){
+    return p.author_token === me.token && (Date.now() - new Date(p.created_at).getTime()) < DAY_MS;
+  }).length;
+  var h = '<div class="sheet-top">'
+    + '<div class="s-avatar" style="background:' + esc(d.color) + '">' + figSVG(d.ini, d.color)
+    + '<span class="dot ' + esc(pm.dot) + '"></span></div>'
+    + '<div><div class="sheet-name">' + esc(d.name) + (mine ? ' (você)' : '') + '</div>'
+    + '<div class="sheet-pres"><span class="dot sm ' + esc(pm.dot) + '"></span>' + (present ? esc(pm.label) : 'Fora da sala') + '</div>'
+    + '<div class="sheet-handle">' + esc(d.handle || '') + '</div></div></div>'
+    + '<div class="sheet-frase">' + (d.frase ? '“' + esc(d.frase) + '”' : '<span style="color:var(--mut)">sem frase por enquanto</span>') + '</div>';
+  if (!mine){
+    h += '<div class="sheet-actions">'
+      + '<button class="abtn nudge" id="pNudge" type="button">👋 chamar atenção</button>'
+      + '<button class="abtn wave" id="pWave" type="button">🙌 acenar</button></div>'
+      + '<div class="sec-title">Sinais <span>chegam gigantes, e somem</span></div>'
+      + '<div class="sig-row">'
+      + ['❤️','👀','☕','🎉'].map(function(e){ return '<button class="sig-btn" type="button" data-sig="' + e + '">' + e + '</button>'; }).join('')
+      + '</div>'
+      + '<div class="sec-title">Sussurro 🤫 <span>só entre vocês dois · some sem histórico</span></div>';
+    if (theirWhisper)
+      h += '<div class="note-quote in"><span class="q-txt">🤫 “' + esc(theirWhisper.text) + '”</span><span class="cd">' + cdText(theirWhisper.exp) + '</span></div>'
+        + '<div class="note-reply-hint">sussurro é só entre vocês dois 🤫</div>';
+    if (myPinsOut)
+      h += '<div class="note-quote out"><span class="q-txt">você sussurrou: “' + esc(myPinsOut.text) + '”</span><span class="cd">' + cdText(myPinsOut.exp) + '</span></div>';
+    h += '<input class="txt-input" id="pWhisper" type="text" maxlength="120" placeholder="sussurrar pra ' + esc(firstNameOf(d.name)) + '…">'
+      + '<button class="abtn wide" id="pWhisperSend" type="button">🤫 sussurrar</button>';
+    if (isOwner(room))
+      h += '<div class="sec-title">Dono da sala</div>'
+        + '<button class="abtn danger" id="pRemove" type="button" style="width:100%">🚪 remover ' + esc(firstNameOf(d.name)) + ' desta sala</button>';
+  } else {
+    h += '<div class="sec-title">Suas fotos nesta sala <span>' + myCount + '/' + PHOTO_CAP + ' nas últimas 24h · somem em 24h</span></div>';
+  }
+  /* fotos da pessoa nesta sala */
+  h += '<div class="sec-title">' + (mine ? 'Postar e ver' : 'Fotos de hoje ' + esc('')) + '<span>polaroides desta sala · 24h</span></div>';
+  if (photos.length){
+    h += '<div class="photo-grid">' + photos.map(function(p){
+      return '<div class="polaroid"><img src="' + esc(p.url) + '" alt="">'
+        + '<div class="p-cap">' + esc(p.legenda || '') + '</div>'
+        + '<div class="p-meta"><span>⏳ ' + cdText(new Date(p.expires_at).getTime()) + '</span>'
+        + (mine ? '' : '<button class="p-react" type="button" data-react="' + esc(token) + '">❤️</button>')
+        + '</div></div>';
+    }).join('') + '</div>';
+  } else {
+    h += '<div class="photo-empty">' + (mine ? 'nenhuma foto sua aqui hoje.' : 'nenhuma foto dele(a) aqui hoje.') + '</div>';
+  }
+  if (mine){
+    h += '<input class="txt-input" id="pCaption" type="text" maxlength="40" placeholder="legenda da foto (opcional)" style="margin-top:10px">'
+      + '<button class="abtn wide" id="pPhotoBtn" type="button">📸 postar foto nesta sala</button>'
+      + '<div class="photo-count">da câmera ou da galeria · vale só pra esta sala · some em 24h</div>'
+      + '<div class="sec-title">Sua conta nesta sala</div>'
+      + '<button class="abtn wave" id="pLeave" type="button" style="width:100%">🚪 sair desta sala</button>';
+  }
+  h += sheetCloseBtn();
+  openSheet(h);
+  bindClose();
+  if (!mine){
+    el('pNudge').addEventListener('click', function(){ sendNudge(roomId, token); });
+    el('pWave').addEventListener('click', function(){ sendSignal(roomId, token, '🙌'); });
+    var sigs = el('sheetContent').querySelectorAll('[data-sig]');
+    for (var i=0;i<sigs.length;i++) sigs[i].addEventListener('click', function(){ sendSignal(roomId, token, this.getAttribute('data-sig')); });
+    el('pWhisperSend').addEventListener('click', function(){
+      var v = el('pWhisper').value.trim();
+      if (v) sendWhisper(roomId, token, v);
+    });
+    var rm = el('pRemove');
+    if (rm) rm.addEventListener('click', function(){ removeMember(roomId, token); });
+  } else {
+    el('pPhotoBtn').addEventListener('click', function(){
+      pendingCaption = el('pCaption').value.trim();
+      el('photoFile').click();
+    });
+    el('pLeave').addEventListener('click', function(){ leaveRoom(roomId); });
+  }
+  var reacts = el('sheetContent').querySelectorAll('[data-react]');
+  for (var j=0;j<reacts.length;j++) reacts[j].addEventListener('click', function(){ sendSignal(roomId, token, '❤️'); });
+}
+
+function openMuralSheet(){
+  var roomId = S.currentRoom; if (!roomId) return;
+  var room = roomById(roomId);
+  var pins = S.pins[roomId] || [];
+  var members = S.members[roomId] || [];
+  var myCount = pins.filter(function(p){ return p.author_token === me.token; }).length;
+  var h = '<div class="sheet-name">📌 Mural da sala</div>'
+    + '<div class="sheet-pres">recados pra quem não estava · tudo some em 24h · você tem ' + myCount + '/2 fixados</div>'
+    + '<div class="mural-list" style="margin-top:14px">';
+  if (!pins.length) h += '<div class="mural-empty">mural vazio — o primeiro recado é seu.</div>';
+  var colors = ['#fff6a8','#ffd9ec','#cfeecb','#d6ecff'];
+  pins.forEach(function(p, i){
+    h += '<div class="mural-note" style="background:' + colors[i % colors.length] + '">'
+      + (p.author_token === me.token ? '<button class="mn-del" type="button" data-delpin="' + p.id + '">✕</button>' : '')
+      + '<div class="mn-txt">' + (p.pra_quem ? '<span class="mn-to">pra ' + esc(p.pra_quem) + ': </span>' : '') + esc(p.texto) + '</div>'
+      + '<div class="mn-meta"><span>' + esc(p.author_name) + '</span><span class="cd">⏳ ' + cdText(new Date(p.expires_at).getTime()) + '</span></div></div>';
+  });
+  h += '</div><div class="mural-form">'
+    + '<input class="txt-input" id="mText" type="text" maxlength="120" placeholder="escreve o recado…">'
+    + '<div class="to-row" id="mToRow"><button class="to-chip sel" type="button" data-to="">pra todos</button>'
+    + members.filter(function(m){ return m.device_token !== me.token; }).map(function(m){
+        var d = personDisplay(roomId, m.device_token);
+        return '<button class="to-chip" type="button" data-to="' + esc(d.name) + '">pra ' + esc(firstNameOf(d.name)) + '</button>';
+      }).join('')
+    + '</div>'
+    + '<button class="abtn wide" id="mSend" type="button" style="background:linear-gradient(150deg,var(--blue1),#63aaea)">📌 fixar no mural (24h)</button></div>'
+    + sheetCloseBtn();
+  openSheet(h);
+  bindClose();
+  var toVal = '';
+  el('mToRow').addEventListener('click', function(ev){
+    var b = ev.target.closest('.to-chip'); if (!b) return;
+    toVal = b.getAttribute('data-to') || '';
+    var chips = el('mToRow').querySelectorAll('.to-chip');
+    for (var i=0;i<chips.length;i++) chips[i].classList.toggle('sel', chips[i] === b);
+  });
+  el('mSend').addEventListener('click', function(){
+    var v = el('mText').value.trim();
+    if (v) pinMural(roomId, v, toVal);
+  });
+  var dels = el('sheetContent').querySelectorAll('[data-delpin]');
+  for (var k=0;k<dels.length;k++) dels[k].addEventListener('click', function(){
+    DB.deletePin(this.getAttribute('data-delpin')).then(function(){
+      DB.broadcast(roomId, 'pins', { from: me.token });
+      refreshPins(roomId).then(openMuralSheet);
+    });
+  });
+  setTimeout(function(){ var i = el('mText'); if (i) i.focus(); }, 80);
+}
+
+function openInviteSheet(){
+  var roomId = S.currentRoom; if (!roomId) return;
+  var room = roomById(roomId);
+  var link = inviteLink(room);
+  var n = (S.members[roomId] || []).length;
+  var h = '<div class="sheet-name">➕ Convidar pra ' + esc(room.name) + '</div>'
+    + '<div class="sheet-pres">quem abrir o link, senta numa poltrona desta sala</div>'
+    + '<div class="sec-title">Link de convite</div>'
+    + '<div class="inv-link">' + esc(link) + '</div>'
+    + '<div class="sheet-actions">'
+    + '<button class="abtn nudge" id="invShare" type="button">📤 compartilhar</button>'
+    + '<button class="abtn wave" id="invCopy" type="button">📋 copiar link</button></div>'
+    + '<div class="inv-code">' + esc(room.invite_code) + '</div>'
+    + '<div class="inv-code-label">código da sala</div>'
+    + '<div class="inv-count">' + n + ' de ' + MAX_SEATS + ' poltronas ocupadas</div>'
+    + '<div class="inv-warn">⚠️ o código é a chave desta sala: manda só pra quem você quer aqui dentro.</div>'
+    + sheetCloseBtn();
+  openSheet(h);
+  bindClose();
+  el('invCopy').addEventListener('click', function(){
+    copyText(link);
+    toast('📋', 'link copiado');
+  });
+  el('invShare').addEventListener('click', function(){
+    if (navigator.share) navigator.share({ title: 'PON — ' + room.name, text: 'entra na minha sala no PON: ', url: link }).catch(function(){});
+    else { copyText(link); toast('📋', 'link copiado — manda pra pessoa'); }
+  });
+}
+function copyText(t){
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(function(){});
+  else {
+    var ta = document.createElement('textarea');
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+  }
+}
+
+var createDraft = { emoji: '❤️', color: '#e93d82' };
+function openCreateSheet(){
+  var emojis = ['❤️','🛋️','☕','🎮','📚','🌙','🎧','⚽','🍻','⭐'];
+  var h = '<div class="sheet-name">🚪 Nova sala</div>'
+    + '<div class="sheet-pres">nasce vazia: só você. depois é só convidar.</div>'
+    + '<div class="sec-title">Nome da sala</div>'
+    + '<input class="txt-input" id="cName" type="text" maxlength="30" placeholder="ex.: Eu &amp; Ela">'
+    + '<div class="sec-title">Símbolo da porta</div><div class="emoji-row" id="cEmojis">'
+    + emojis.map(function(e, i){ return '<button class="pick-btn' + (i === 0 ? ' sel' : '') + '" type="button" data-emo="' + e + '">' + e + '</button>'; }).join('')
+    + '</div><div class="sec-title">Cor</div><div class="color-row" id="cColors">'
+    + PALETTE.map(function(c, i){ return '<button class="color-btn' + (i === 6 ? ' sel' : '') + '" type="button" data-cor="' + c + '" style="background:' + c + '"></button>'; }).join('')
+    + '</div>'
+    + '<button class="abtn wide" id="cCreate" type="button" style="background:linear-gradient(150deg,var(--blue1),#63aaea)">criar sala</button>'
+    + sheetCloseBtn();
+  openSheet(h);
+  bindClose();
+  createDraft = { emoji: '❤️', color: PALETTE[6] };
+  el('cEmojis').addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-emo]'); if (!b) return;
+    createDraft.emoji = b.getAttribute('data-emo');
+    this.querySelectorAll('.pick-btn').forEach(function(x){ x.classList.toggle('sel', x === b); });
+  });
+  el('cColors').addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-cor]'); if (!b) return;
+    createDraft.color = b.getAttribute('data-cor');
+    this.querySelectorAll('.color-btn').forEach(function(x){ x.classList.toggle('sel', x === b); });
+  });
+  el('cCreate').addEventListener('click', function(){
+    var name = el('cName').value.trim();
+    if (!name){ toast('✏️', 'dá um nome pra sala primeiro'); return; }
+    createRoom(name, createDraft.emoji, createDraft.color);
+  });
+  setTimeout(function(){ var i = el('cName'); if (i) i.focus(); }, 80);
+}
+
+function openRoomMenu(){
+  var roomId = S.currentRoom; if (!roomId) return;
+  var room = roomById(roomId);
+  var h = '<div class="sheet-name">⚙️ ' + esc(room.name) + '</div>'
+    + '<div class="sheet-pres">código da sala: <b>' + esc(room.invite_code) + '</b></div>'
+    + '<button class="abtn wave" id="rmInvite" type="button" style="width:100%;margin-top:14px">➕ convidar (ver link e código)</button>'
+    + '<button class="abtn wave" id="rmLeave" type="button" style="width:100%;margin-top:10px">🚪 sair desta sala</button>';
+  if (isOwner(room))
+    h += '<div class="sec-title">Dono da sala</div>'
+      + '<button class="abtn danger" id="rmDelete" type="button" style="width:100%">🗑️ apagar esta sala pra todos</button>';
+  h += sheetCloseBtn();
+  openSheet(h);
+  bindClose();
+  el('rmInvite').addEventListener('click', openInviteSheet);
+  el('rmLeave').addEventListener('click', function(){ leaveRoom(roomId); });
+  var del = el('rmDelete');
+  if (del) del.addEventListener('click', function(){
+    if (this.getAttribute('data-arm') === '1'){
+      DB.broadcast(roomId, 'roomdel', { from: me.token });
+      DB.deleteRoom(roomId).then(function(){ removeRoomLocal(roomId); toast('🗑️', 'sala apagada'); });
+    } else {
+      this.setAttribute('data-arm', '1');
+      this.textContent = '🗑️ tem certeza? toca de novo pra apagar';
+    }
+  });
+}
+
+/* ================= AÇÕES ================= */
+function revealIfGhost(roomId){
+  if (me.estado === 'invisible'){
+    me.estado = 'online'; saveMe(); renderCanto();
+    propagateMeta(roomId);
+    if (S.currentRoom === roomId) trackMe(roomId);
+    toast('👻', 'você apareceu na sala — falar entrega o fantasma');
+  }
+}
+function propagateMeta(roomId){
+  var meta = myMeta();
+  var patch = { name: meta.name, handle: meta.handle, frase: meta.frase, estado: meta.estado, color: meta.color };
+  Object.keys(S.myMembers).forEach(function(rid){ DB.updateMember(rid, me.token, patch).catch(function(){}); });
+  if (roomId) DB.broadcast(roomId, 'meta', Object.assign({ from: me.token }, meta));
+  Object.keys(S.rooms).forEach(function(){});
+  S.rooms.forEach(function(r){ if (r.id !== roomId) DB.broadcast(r.id, 'meta', Object.assign({ from: me.token }, meta)); });
+}
+function say(text){
+  var roomId = S.currentRoom; if (!roomId) return;
+  text = String(text || '').trim(); if (!text) return;
+  revealIfGhost(roomId);
+  pushSpeech(roomId, me.token, text, true);
+  S.lastTalkAt[roomId] = Date.now();
+  DB.broadcast(roomId, 'say', { from: me.token, name: me.name, text: text });
+  SoundFX.play('popme');
+  el('talkInput').value = '';
+  renderRoom();
+  focusOn(me.token);
+}
+function sendWhisper(roomId, token, text){
+  revealIfGhost(roomId);
+  (S.whispers[roomId] = S.whispers[roomId] || {})[token] = { text: text, exp: Date.now() + WHISPER_TTL, fromMe: true };
+  DB.broadcast(roomId, 'whisper', { from: me.token, to: token, name: me.name, text: text });
+  SoundFX.play('popme');
+  closeSheet();
+  renderRoom();
+  focusOn(token);
+  toast('🤫', 'sussurro enviado — só entre vocês dois');
+}
+function sendSignal(roomId, token, emoji){
+  (S.bursts[roomId] = S.bursts[roomId] || {})[token] = { emoji: emoji, until: Date.now() + 1500 };
+  DB.broadcast(roomId, 'signal', { from: me.token, to: token, emoji: emoji });
+  closeSheet();
+  renderRoom();
+  focusOn(token);
+  setTimeout(function(){ renderRoom(); }, 1600);
+}
+function sendNudge(roomId, token){
+  DB.broadcast(roomId, 'nudge', { from: me.token, to: token, name: me.name });
+  shakeChar(token);
+  closeSheet();
+  focusOn(token);
+  toast('👋', 'atenção chamada — o celular dela treme na sala');
+}
+function pinMural(roomId, text, toName){
+  var pins = S.pins[roomId] || [];
+  var mine = pins.filter(function(p){ return p.author_token === me.token; });
+  if (mine.length >= 2){ toast('📌', 'máximo de 2 recados seus no mural — apaga um pra fixar outro'); return Promise.resolve(false); }
+  var pin = {
+    room_id: roomId, author_token: me.token, author_name: me.name || 'Você',
+    texto: text.slice(0, 120), pra_quem: toName || '',
+    expires_at: new Date(Date.now() + DAY_MS).toISOString()
+  };
+  return DB.addPin(pin).then(function(){
+    DB.broadcast(roomId, 'pins', { from: me.token });
+    return refreshPins(roomId);
+  }).then(function(){ openMuralSheet(); toast('📌', 'recado fixado — some em 24h'); })
+    .catch(function(){ toast('⚠️', 'não consegui fixar agora — tenta de novo'); });
+}
+function removeMember(roomId, token){
+  DB.deleteMember(roomId, token).then(function(){
+    DB.broadcast(roomId, 'kicked', { from: me.token, to: token });
+    refreshMembers(roomId);
+    closeSheet();
+    toast('🚪', 'pessoa removida da sala');
+  });
+}
+function leaveRoom(roomId){
+  DB.untrack(roomId, me.token);
+  DB.deleteMember(roomId, me.token).then(function(){ removeRoomLocal(roomId); toast('🚪', 'você saiu da sala'); });
+}
+function createRoom(name, emoji, color){
+  if (!me.name){ toast('✏️', 'primeiro escreve seu nome no topo — é como vão te chamar'); openIdEdit(); return; }
+  var data = { name: name, emoji: emoji, color: color, invite_code: makeCode(), owner_token: me.token };
+  return DB.createRoom(data).then(function(room){
+    var meta = myMeta();
+    return DB.joinRoom(room.id, {
+      device_token: me.token, name: meta.name, handle: meta.handle, frase: meta.frase,
+      estado: meta.estado, color: meta.color
+    }).then(function(member){
+      S.rooms.push(room);
+      S.myMembers[room.id] = member;
+      S.members[room.id] = [member];
+      wireRoom(room.id);
+      closeSheet();
+      renderHall();
+      enterRoom(room.id);
+      setTimeout(openInviteSheet, 350);
+      toast('🚪', 'sala criada! manda o convite pra primeira pessoa');
+    });
+  }).catch(function(){ toast('⚠️', 'não consegui criar a sala — confere a conexão'); });
+}
+function joinByCode(code){
+  code = String(code || '').trim().toUpperCase();
+  if (!code) return;
+  if (!me.name){ toast('✏️', 'primeiro escreve seu nome no topo — é como vão te chamar'); openIdEdit(); return; }
+  DB.getRoomByCode(code).then(function(room){
+    if (!room){ toast('🔍', 'não achei sala com esse código'); return; }
+    if (roomById(room.id)){ enterRoom(room.id); return; }
+    if ((S.members[room.id] || []).length >= MAX_SEATS){ /* checagem real vem do servidor na entrada */ }
+    var meta = myMeta();
+    DB.joinRoom(room.id, {
+      device_token: me.token, name: meta.name, handle: meta.handle, frase: meta.frase,
+      estado: meta.estado, color: meta.color
+    }).then(function(member){
+      S.rooms.push(room);
+      S.myMembers[room.id] = member;
+      wireRoom(room.id);
+      return DB.listMembers(room.id).then(function(list){
+        S.members[room.id] = list;
+        DB.broadcast(room.id, 'joined', { from: me.token, name: me.name });
+        renderHall();
+        enterRoom(room.id);
+        toast('🎉', 'você entrou em <b>' + esc(room.name) + '</b>');
+      });
+    });
+  }).catch(function(){ toast('⚠️', 'não consegui entrar — confere o código e a conexão'); });
+}
+
+/* ---- fotos ---- */
+var pendingCaption = '';
+function postPhotoData(dataUrl, caption){
+  var roomId = S.currentRoom; if (!roomId) return Promise.resolve(false);
+  var mine = (S.photos[roomId] || []).filter(function(p){
+    return p.author_token === me.token && (Date.now() - new Date(p.created_at).getTime()) < DAY_MS;
+  });
+  if (mine.length >= PHOTO_CAP){ toast('📸', 'limite de 3 fotos em 24h nesta sala'); return Promise.resolve(false); }
+  return new Promise(function(resolve){
+    downscaleImage(dataUrl, function(small){
+      var blob = dataUrlToBlob(small);
+      DB.uploadPhoto(roomId, me.token, blob).then(function(up){
+        return DB.addPhoto({
+          room_id: roomId, author_token: me.token, author_name: me.name || 'Você',
+          url: up.url, storage_path: up.path, legenda: (caption || '').slice(0, 40),
+          expires_at: new Date(Date.now() + DAY_MS).toISOString()
+        });
+      }).then(function(){
+        DB.broadcast(roomId, 'photos', { from: me.token });
+        return refreshPhotos(roomId);
+      }).then(function(){
+        closeSheet();
+        toast('📸', 'foto postada nesta sala — some em 24h');
+        resolve(true);
+      }).catch(function(){ toast('⚠️', 'a foto não subiu — tenta de novo'); resolve(false); });
+    });
+  });
+}
+function dataUrlToBlob(d){
+  var parts = String(d).split(',');
+  var mime = (/data:(.*?);/.exec(parts[0]) || [])[1] || 'image/jpeg';
+  var bin = atob(parts[1] || '');
+  var arr = new Uint8Array(bin.length);
+  for (var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+function downscaleImage(dataUrl, cb){
+  var done = false;
+  function fin(v){ if (!done){ done = true; cb(v); } }
+  try {
+    var img = new Image();
+    img.onload = function(){
+      try {
+        var max = 800, w = img.width, h = img.height;
+        var scale = Math.min(1, max / Math.max(w, h));
+        var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+        var cv = document.createElement('canvas');
+        cv.width = cw; cv.height = ch;
+        var cx = cv.getContext('2d');
+        if (!cx) return fin(dataUrl);
+        cx.drawImage(img, 0, 0, cw, ch);
+        fin(cv.toDataURL('image/jpeg', 0.82));
+      } catch(e){ fin(dataUrl); }
+    };
+    img.onerror = function(){ fin(dataUrl); };
+    img.src = dataUrl;
+  } catch(e){ fin(dataUrl); }
+}
+el('photoFile').addEventListener('change', function(){
+  var f = this.files && this.files[0];
+  this.value = '';
+  if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function(){ postPhotoData(String(rd.result), pendingCaption); };
+  rd.readAsDataURL(f);
+});
+
+/* ---- identidade: editar e propagar ---- */
+function openIdEdit(){
+  el('edName').value = me.name || '';
+  el('edHandle').value = (me.handle || '').replace(/^@+/,'');
+  el('edFrase').value = me.frase || '';
+  el('idEdit').classList.add('open');
+}
+function closeIdEdit(){ el('idEdit').classList.remove('open'); }
+function saveIdentity(){
+  var name = el('edName').value.trim();
+  var handle = el('edHandle').value.trim().replace(/^@+/,'').replace(/\s+/g,'.');
+  var frase = el('edFrase').value.trim();
+  if (!name){ toast('✏️', 'o nome não pode ficar vazio'); return; }
+  me.name = name; me.handle = handle; me.frase = frase;
+  me.ini = iniOf(name);
+  saveMe();
+  closeIdEdit();
+  renderCanto();
+  propagateMeta(S.currentRoom);
+  if (S.currentRoom){ trackMe(S.currentRoom); renderRoom(); }
+  toast('✏️', 'perfil atualizado em todas as salas');
+}
+function setEstado(est){
+  if (me.estado === est) return;
+  var wasGhost = me.estado === 'invisible';
+  me.estado = est; saveMe(); renderCanto();
+  propagateMeta(S.currentRoom);
+  if (S.currentRoom){
+    trackMe(S.currentRoom);
+    renderRoom();
+  }
+  if (est === 'invisible') toast('👻', 'modo invisível: você vê a sala, ninguém te vê');
+  else if (wasGhost) toast('👋', 'você apareceu de novo');
+}
+
+/* ================= LIGAR A TELA ================= */
+el('meRow').addEventListener('click', function(){
+  if (el('idEdit').classList.contains('open')) closeIdEdit(); else openIdEdit();
+});
+el('edSave').addEventListener('click', saveIdentity);
+el('edCancel').addEventListener('click', closeIdEdit);
+el('presBar').addEventListener('click', function(ev){
+  var b = ev.target.closest('[data-pres]'); if (!b) return;
+  SoundFX.unlock();
+  setEstado(b.getAttribute('data-pres'));
+});
+el('btnSound').addEventListener('click', function(ev){
+  ev.stopPropagation();
+  var on = SoundFX.toggle();
+  renderCanto();
+  if (on){ SoundFX.unlock(); SoundFX.play('enter'); }
+});
+document.addEventListener('pointerdown', function(){ SoundFX.unlock(); }, { once: true });
+el('btnHall').addEventListener('click', leaveToHall);
+el('btnInvite').addEventListener('click', openInviteSheet);
+el('btnRoomMenu').addEventListener('click', openRoomMenu);
+el('btnSay').addEventListener('click', function(){ say(el('talkInput').value); });
+el('talkInput').addEventListener('keydown', function(ev){ if (ev.key === 'Enter') say(this.value); });
+el('vbTalk').addEventListener('click', function(){ el('talkInput').focus(); });
+el('vbMural').addEventListener('click', openMuralSheet);
+el('vbFoto').addEventListener('click', function(){ openPersonSheet(S.currentRoom, me.token); });
+el('btnAloneMural').addEventListener('click', openMuralSheet);
+el('corkboard').addEventListener('click', openMuralSheet);
+el('btnBirth').addEventListener('click', openCreateSheet);
+el('btnJoinCode').addEventListener('click', function(){ joinByCode(el('joinCodeInput').value); });
+el('joinCodeInput').addEventListener('keydown', function(ev){ if (ev.key === 'Enter') joinByCode(this.value); });
+
+/* ================= TICKER (1s) ================= */
+setInterval(function(){
+  var changed = pruneEphemeral();
+  if (S.currentRoom){
+    if (changed) renderRoom();
+    else {
+      /* atualiza só os cronômetros visíveis */
+      var cds = el('roomChars').querySelectorAll('.balloon .cd, .whisper-bal .cd');
+      if (cds.length) renderRoom();
+    }
+    updateSky();
+  }
+  if (!S.currentRoom) renderHall();
+}, 1000);
+
+/* ================= PWA (instalabilidade básica) ================= */
+(function(){
+  try {
+    var manifest = {
+      name: 'PON — suas salas', short_name: 'PON', start_url: '.', scope: '.',
+      display: 'standalone', background_color: '#eef5fb', theme_color: '#3f8fe0',
+      icons: [{ src: 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' rx=\'22\' fill=\'%233f8fe0\'/%3E%3Ctext x=\'50\' y=\'68\' font-size=\'52\' text-anchor=\'middle\' fill=\'white\' font-family=\'Arial\' font-weight=\'bold\'%3EP%3C/text%3E%3C/svg%3E', sizes: 'any', type: 'image/svg+xml' }]
+    };
+    var l = document.createElement('link');
+    l.rel = 'manifest';
+    l.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
+    document.head.appendChild(l);
+  } catch(e){}
+  try {
+    if ('serviceWorker' in navigator && window.Blob && URL.createObjectURL){
+      var swCode = 'self.addEventListener(\'fetch\', function(e){});';
+      navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], { type: 'text/javascript' }))).catch(function(){});
+    }
+  } catch(e){}
+})();
+
+/* ================= BOOT ================= */
+function boot(){
+  renderCanto();
+  var useFake = !!window.PON_FAKE || /[?&]fake=1/.test(location.search) || location.hash.indexOf('ponfake') >= 0;
+  try {
+    DB = useFake ? createFakeAdapter() : createRealAdapter();
+  } catch(e){
+    el('netBanner').classList.add('show');
+    DB = createFakeAdapter();
+  }
+  window.PON = { S: S, me: me, db: DB, fake: DB.kind === 'fake' ? DB : null,
+                 say: say, createRoom: createRoom, joinByCode: joinByCode,
+                 enterRoom: enterRoom, pinMural: pinMural, postPhotoData: postPhotoData };
+  return DB.listMyRooms(me.token).then(function(data){
+    S.rooms = data.rooms || [];
+    (data.members || []).forEach(function(m){
+      S.myMembers[m.room_id] = m;
+      if (m.seat_x != null && m.seat_y != null)
+        (S.seats[m.room_id] = S.seats[m.room_id] || {})[me.token] = { x: +m.seat_x, y: +m.seat_y };
+    });
+    var jobs = S.rooms.map(function(room){
+      wireRoom(room.id);
+      return refreshMembers(room.id);
+    });
+    return Promise.all(jobs);
+  }).then(function(){
+    renderHall();
+    S.booted = true;
+    /* convite na URL? #c/CÓDIGO */
+    var m = /#c\/([A-Za-z0-9]+)/.exec(location.hash || '');
+    if (m) joinByCode(m[1]);
+    else if (!me.name) setTimeout(openIdEdit, 400);
+  }).catch(function(){
+    el('netBanner').classList.add('show');
+    renderHall();
+    S.booted = true;
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+</script>
+</body>
+</html>
