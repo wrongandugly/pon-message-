@@ -332,9 +332,9 @@
   .ghost-note.show{ display:block; }
 
   /* poltronas + bonecos */
-  #roomChars{ position:absolute; inset:0; z-index:10; }
+  #roomChars{ position:absolute; inset:0; z-index:10; pointer-events:none; }
   .char{
-    position:absolute; width:84px; text-align:center; cursor:grab;
+    position:absolute; width:84px; text-align:center; cursor:grab; pointer-events:auto;
     transform:translate(-50%,-100%);
     transition:left 1.2s ease, top 1.2s ease;
     touch-action:none; user-select:none; -webkit-user-select:none;
@@ -824,7 +824,7 @@
 var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
 var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
 var PUSH_FN_URL = SB_URL + '/functions/v1/send-push';
-var APP_VERSION = '1.4.0';   /* exibida nas Configurações */
+var APP_VERSION = '1.4.1';   /* exibida nas Configurações */
 /* chave pública VAPID de mentira, só pro adaptador fake (a de verdade
    nasce dentro da Edge Function e nunca aparece em arquivo) */
 var FAKE_VAPID = 'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks';
@@ -1086,7 +1086,7 @@ var SoundFX = (function(){
     enter:  function(){ tone(660, 660, 0, 0.09, 0.10); tone(990, 990, 0.09, 0.14, 0.10); },
     exit:   function(){ tone(880, 587, 0, 0.16, 0.08); },
     pop:    function(){
-      var n = Date.now(); if (n - lastPop < 4000) return; lastPop = n;
+      var n = Date.now(); if (n - lastPop < 600) return; lastPop = n;
       tone(520, 180, 0, 0.11, 0.11);
     },
     popme:  function(){ tone(460, 170, 0, 0.10, 0.09); },
@@ -1656,6 +1656,18 @@ function onPresence(roomId, metas){
 }
 function onEvent(roomId, type, p){
   if (!p || p.from === me.token) return;
+  /* QUALQUER sinal de vida na sala É presença: a fala (e o sussurro, o
+     sinal, a cutucada) chega pelo broadcast mesmo quando o track de
+     presença se perdeu — quem falou ESTÁ aqui. Sem este carimbo, o balão
+     ficava refém do heartbeat curar a presença: a linha chegava, mas o
+     balão só aparecia até 20s depois (o "delay") ou nem aparecia (a
+     poltrona virava jaqueta). É o mesmo princípio do evento 'hb'. */
+  if (type !== 'hb'){
+    var dPrev = personDisplay(roomId, p.from);
+    (S.lastHb[roomId] = S.lastHb[roomId] || {})[p.from] = {
+      at: Date.now(), estado: dPrev.estado !== 'offline' ? dPrev.estado : 'online'
+    };
+  }
   var room = roomById(roomId);
   if (type === 'say'){
     pushSpeech(roomId, p.from, p.text, false);
@@ -3101,7 +3113,7 @@ el('setPushBtn').addEventListener('click', function(){
 });
 el('setProfileRow').addEventListener('click', function(){ closeSettings(); openIdEdit(); });
 el('setInstallRow').addEventListener('click', function(){ closeSettings(); openInstall(null); });
-document.addEventListener('pointerdown', function(){ SoundFX.unlock(); }, { once: true });
+document.addEventListener('pointerdown', function(){ SoundFX.unlock(); });
 el('btnHall').addEventListener('click', leaveToHall);
 el('btnInvite').addEventListener('click', openInviteSheet);
 el('btnRoomMenu').addEventListener('click', openRoomMenu);
