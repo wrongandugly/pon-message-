@@ -7,7 +7,7 @@
    Trocar a versão do CACHE a cada deploy que mudar os arquivos.
    ===================================================================== */
 
-var CACHE = "wu-game-v1";
+var CACHE = "wu-game-v2";
 var PRECACHE = [
   "./",
   "./index.html",
