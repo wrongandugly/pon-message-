@@ -834,7 +834,7 @@
 var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
 var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
 var PUSH_FN_URL = SB_URL + '/functions/v1/send-push';
-var APP_VERSION = '1.4.3';   /* exibida nas Configurações */
+var APP_VERSION = '1.4.4';   /* exibida nas Configurações */
 /* chave pública VAPID de mentira, só pro adaptador fake (a de verdade
    nasce dentro da Edge Function e nunca aparece em arquivo) */
 var FAKE_VAPID = 'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks';
@@ -1193,6 +1193,19 @@ function createFakeAdapter(){
       if (m[k] && m[k].talk) m[k].talk(clone(row));
     });
   }
+  /* entrega um UPDATE de members como o postgres_changes faria
+     (presença pelo banco, v1.4.4): pros inscritos da sala, menos quem
+     escreveu (ele já sabe o próprio carimbo) e menos quem está com o
+     socket caído — pra esses, a sondagem de members recolhe depois. */
+  function emitMemberRow(row, exceptClientId){
+    var m = bus.subs[row.room_id] || {};
+    Object.keys(m).forEach(function(k){
+      if (k === exceptClientId) return;
+      var dono = bus.clients[k];
+      if (dono && dono.talkDown) return;
+      if (m[k] && m[k].member) m[k].member(clone(row));
+    });
+  }
   var api = {
     kind: 'fake', store: store,
     listMyRooms: function(token){
@@ -1227,6 +1240,14 @@ function createFakeAdapter(){
       store.members.forEach(function(m){
         if (m.room_id === roomId && m.device_token === token) Object.assign(m, patch);
       });
+      return Promise.resolve(true);
+    },
+    /* presença pelo banco (v1.4.4): carimba o MEU last_seen e avisa
+       os outros inscritos como um UPDATE de members (postgres_changes) */
+    touchSeen: function(roomId, iso){
+      var myTok = bus.clients[clientId].token;
+      var row = store.members.filter(function(m){ return m.room_id === roomId && m.device_token === myTok; })[0];
+      if (row){ row.last_seen = iso; emitMemberRow(row, clientId); }
       return Promise.resolve(true);
     },
     deleteMember: function(roomId, token){
@@ -1451,6 +1472,12 @@ function createRealAdapter(){
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'talk', filter: 'room_id=eq.' + roomId }, function(payload){
       if (st.cbs && st.cbs.talk && payload && payload.new) st.cbs.talk(payload.new);
     });
+    /* presença pelo banco (v1.4.4): UPDATE em members (o carimbo
+       last_seen de alguém) chega pelo mesmo canal — via rápida da
+       presença nova; a sondagem de 10s é a rede de segurança. */
+    ch.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'members', filter: 'room_id=eq.' + roomId }, function(payload){
+      if (st.cbs && st.cbs.member && payload && payload.new) st.cbs.member(payload.new);
+    });
     st.ready = new Promise(function(res){
       ch.subscribe(function(status){
         st.status = status;
@@ -1507,6 +1534,25 @@ function createRealAdapter(){
     },
     updateMember: function(roomId, token, patch){
       return rows(sb.from('members').update(patch).eq('room_id', roomId).eq('device_token', token)).then(function(){ return true; });
+    },
+    /* presença pelo banco (v1.4.4): PATCH do MEU last_seen. Na saída
+       (keepalive), o fetch cru com keepalive:true é quem sobrevive ao
+       pagehide — o cliente do supabase-js pode ser morto no caminho. */
+    touchSeen: function(roomId, iso, keepalive){
+      if (keepalive){
+        try {
+          return fetch(SB_URL + '/rest/v1/members?room_id=eq.' + encodeURIComponent(roomId)
+            + '&device_token=eq.' + encodeURIComponent(me.token), {
+            method: 'PATCH', keepalive: true,
+            headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
+                       'x-device-token': me.token, 'Content-Type': 'application/json',
+                       'Prefer': 'return=minimal' },
+            body: JSON.stringify({ last_seen: iso })
+          }).then(function(){ return true; }).catch(function(){ return false; });
+        } catch(e){ return Promise.resolve(false); }
+      }
+      return rows(sb.from('members').update({ last_seen: iso }).eq('room_id', roomId).eq('device_token', me.token))
+        .then(function(){ return true; }).catch(function(){ return false; });
     },
     deleteMember: function(roomId, token){
       return rows(sb.from('members').delete().eq('room_id', roomId).eq('device_token', token)).then(function(){ return true; });
@@ -1660,6 +1706,9 @@ var S = {
   lastTalkAt: {},       /* roomId -> ts da última fala (qualquer um) */
   bursts: {},           /* roomId -> { token: {emoji, until} } */
   lastHb: {},           /* roomId -> { token: {at, estado} } — heartbeat recente (broadcast 'hb') */
+  outAt: {},            /* roomId -> { token: ts } — saída EXPLÍCITA (bye/sentinela): cola até prova nova (v1.4.4) */
+  presV: {},            /* roomId -> { token: {shown, outSince, miss} } — veredito com histerese (v1.4.4) */
+  popDone: {},          /* roomId -> { rowId: 1 } — o pop de cada linha toca UMA vez (v1.4.4) */
   roomPhotoV: {},       /* roomId -> versão da foto da sala (de quem não é dono) */
   currentRoom: null,
   booted: false
@@ -1681,6 +1730,80 @@ function hbFresh(roomId, token){
   return !!hb && (Date.now() - hb.at < HB_FRESH_MS);
 }
 function presFresh(p){ return !!p && (!p.ts || (Date.now() - p.ts < PRES_FRESH_MS)); }
+/* ============ PRESENÇA PELO BANCO (v1.4.4) ============
+   A fonte da verdade mudou de casa: além do Presence/Broadcast
+   (refém do WebSocket, que o celular mata ao trocar de app), cada
+   pessoa carimba o próprio members.last_seen a cada 15s enquanto
+   está na sala com a página visível — e grava a SENTINELA de saída
+   (2000-01-01) ao esconder/fechar. Quem lê considera prova:
+   heartbeat fresco OU presença fresca OU last_seen < 35s.
+   Saída EXPLÍCITA (broadcast 'bye' ou a sentinela chegando) cola:
+   a pessoa consta fora na hora, e só uma prova NOVA (fala, hb,
+   sync, carimbo fresco) a traz de volta.
+   E o veredito tem HISTERESE assimétrica: entrar é instantâneo;
+   sair exige 2 leituras seguidas de ausência OU 3s contínuos sem
+   prova — uma leitura azarada não derruba ninguém (sem pisca-pisca).
+   As "leituras" são os momentos de dados: sync de presença, GET de
+   members, UPDATE de members e o ticker de 1s. */
+var DBSEEN_FRESH_MS = 35000, PRES_OUT_MS = 3000, PRES_MISS_NEED = 2;
+var SEEN_SENTINEL_MS = 946684800000;   /* 2000-01-02: qualquer last_seen antes disso é a sentinela de saída */
+var SEEN_SENTINEL_ISO = '2000-01-01T00:00:00.000Z';
+function lastSeenMs(roomId, token){
+  var mem = memberOf(roomId, token);
+  if (!mem || !mem.last_seen) return 0;
+  var t = new Date(mem.last_seen).getTime();
+  return isNaN(t) ? 0 : t;
+}
+/* limiar "carimbo de verdade": a sentinela é 2000-01-01; qualquer
+   last_seen de 2001 pra trás é sentinela, de 2001 pra frente é real.
+   (fronteira única — o valor exato da sentinela NÃO pode ser o corte,
+   senão ela mesma cai no ramo errado) */
+var SEEN_REAL_MIN_MS = 978307200000;   /* 2001-01-01 */
+function isSentinelSeen(roomId, token){
+  var t = lastSeenMs(roomId, token);
+  return t > 0 && t < SEEN_REAL_MIN_MS;
+}
+function dbSeenFresh(roomId, token){
+  var t = lastSeenMs(roomId, token);
+  return t >= SEEN_REAL_MIN_MS && (Date.now() - t < DBSEEN_FRESH_MS);
+}
+function hasProof(roomId, token){
+  return hbFresh(roomId, token)
+      || presFresh((S.presence[roomId] || {})[token])
+      || dbSeenFresh(roomId, token);
+}
+function markOut(roomId, token){
+  (S.outAt[roomId] = S.outAt[roomId] || {})[token] = Date.now();
+  var V = (S.presV[roomId] = S.presV[roomId] || {});
+  if (V[token]){ V[token].shown = false; V[token].outSince = 0; V[token].miss = 0; }
+}
+function clearOut(roomId, token){
+  if (S.outAt[roomId]) delete S.outAt[roomId][token];
+}
+/* UMA leitura de dados sobre UMA pessoa: atualiza o veredito com
+   histerese. Prova → dentro na hora. Saída explícita → fora na hora.
+   Silêncio → conta a leitura; só derruba na 2ª seguida ou com 3s. */
+function sweepToken(roomId, token){
+  if (token === me.token) return;
+  /* a sentinela vista numa leitura (GET/poll) cola a saída igual à
+     que chega pelo UPDATE em tempo real — as duas vias convergem */
+  if (isSentinelSeen(roomId, token) && !(S.outAt[roomId] || {})[token])
+    (S.outAt[roomId] = S.outAt[roomId] || {})[token] = Date.now();
+  var V = (S.presV[roomId] = S.presV[roomId] || {});
+  var v = V[token] || (V[token] = { shown: false, outSince: 0, miss: 0 });
+  /* saída explícita vence prova VELHA: quem volta é pelos eventos que
+     limpam o outAt (fala, hb, sync com a pessoa, carimbo fresco) */
+  if ((S.outAt[roomId] || {})[token]){ v.shown = false; v.outSince = 0; v.miss = 0; return; }
+  if (hasProof(roomId, token)){ v.shown = true; v.outSince = 0; v.miss = 0; return; }
+  if (!v.shown) return;
+  if (!v.outSince){ v.outSince = Date.now(); v.miss = 1; return; }
+  v.miss++;
+  if (v.miss >= PRES_MISS_NEED) { v.shown = false; v.outSince = 0; v.miss = 0; }
+}
+function sweepPresence(roomId){
+  (S.members[roomId] || []).forEach(function(m){ sweepToken(roomId, m.device_token); });
+  Object.keys(S.presence[roomId] || {}).forEach(function(t){ sweepToken(roomId, t); });
+}
 function personDisplay(roomId, token){
   if (token === me.token) return myMeta();
   var pres = (S.presence[roomId] || {})[token];
@@ -1689,6 +1812,7 @@ function personDisplay(roomId, token){
   var p = pres || {};
   var estado = presFresh(pres) ? (p.estado || 'online')
              : hbFresh(roomId, token) ? (hbEntry(roomId, token).estado || 'online')
+             : dbSeenFresh(roomId, token) ? (base.estado || 'online')
              : 'offline';
   return {
     token: token,
@@ -1707,8 +1831,24 @@ function presentTokens(roomId){
 }
 function isPresent(roomId, token){
   if (token === me.token) return S.currentRoom === roomId;
-  if (hbFresh(roomId, token)) return true;
-  return presFresh((S.presence[roomId] || {})[token]);
+  var V = (S.presV[roomId] = S.presV[roomId] || {});
+  var v = V[token] || (V[token] = { shown: false, outSince: 0, miss: 0 });
+  /* prova viva: dentro NA HORA (entrar nunca espera leitura) */
+  if (hasProof(roomId, token) && !(S.outAt[roomId] || {})[token]){
+    v.shown = true; v.outSince = 0; v.miss = 0;
+    return true;
+  }
+  /* saída explícita (bye/sentinela): fora NA HORA, sem histerese */
+  if ((S.outAt[roomId] || {})[token]){ v.shown = false; return false; }
+  if (!v.shown) return false;
+  /* sem prova e sem saída anunciada: a histerese segura o veredito —
+     as leituras (sweepToken) derrubam na 2ª ausência seguida; aqui,
+     a perna passiva dos 3s contínuos sem prova. */
+  if (v.outSince && (Date.now() - v.outSince) >= PRES_OUT_MS){
+    v.shown = false; v.outSince = 0; v.miss = 0;
+    return false;
+  }
+  return true;
 }
 function seatPos(roomId, token, idx){
   var sm = S.seats[roomId] || {};
@@ -1743,13 +1883,37 @@ function wireRoom(roomId){
     event: function(type, payload){ onEvent(roomId, type, payload); },
     /* fala pelo banco: via rápida (postgres_changes) + catch-up no rejoin */
     talk: function(row){ onTalkRow(roomId, row); },
+    /* presença pelo banco (v1.4.4): UPDATE de members (last_seen) */
+    member: function(row){ onMemberRow(roomId, row); },
     reconnect: function(){ refreshTalk(roomId); }
   });
+}
+/* uma linha de members mudou no banco (postgres_changes): funde na
+   cópia local e traduz o last_seen — carimbo fresco = prova nova
+   (limpa a saída colada); SENTINELA = saída explícita (cola a saída). */
+function onMemberRow(roomId, row){
+  if (!row || !row.device_token) return;
+  var list = S.members[roomId]; if (!list) return;
+  var mem = null;
+  list.forEach(function(m){ if (m.device_token === row.device_token) mem = m; });
+  if (mem) Object.assign(mem, row); else list.push(row);
+  var mine = S.myMembers[roomId];
+  if (mine && row.device_token === me.token) S.myMembers[roomId] = mem || row;
+  if (row.seat_x != null && row.seat_y != null)
+    (S.seats[roomId] = S.seats[roomId] || {})[row.device_token] = { x: +row.seat_x, y: +row.seat_y };
+  if (row.device_token === me.token) return;   /* meu eco: só funde, não me julgo pelo banco */
+  var t = row.last_seen ? new Date(row.last_seen).getTime() : 0;
+  if (t > 0 && t < SEEN_REAL_MIN_MS) markOut(roomId, row.device_token);        /* sentinela = saiu */
+  else if (t >= SEEN_REAL_MIN_MS) clearOut(roomId, row.device_token);          /* carimbo real = prova nova */
+  sweepToken(roomId, row.device_token);
+  if (S.currentRoom === roomId) renderRoom();
+  renderHall();
 }
 /* carimbo de prova-de-vida: quem deu sinal na sala ESTÁ na sala —
    vale pra broadcast (fala antiga, sinal, cutucada) e pra linha da
    talk que acabou de chegar (v1.4.3). */
 function stampLife(roomId, token){
+  clearOut(roomId, token);   /* prova NOVA descola qualquer saída antiga (v1.4.4) */
   var dPrev = personDisplay(roomId, token);
   (S.lastHb[roomId] = S.lastHb[roomId] || {})[token] = {
     at: Date.now(), estado: dPrev.estado !== 'offline' ? dPrev.estado : 'online'
@@ -1760,6 +1924,11 @@ function onPresence(roomId, metas){
   var nowMap = {};
   metas.forEach(function(m){ if (m && m.token) nowMap[m.token] = m; });
   S.presence[roomId] = nowMap;
+  /* o sync é a foto atual do servidor: quem CONSTA nele deu prova
+     nova (descola a saída); e o sync inteiro é UMA leitura de dados
+     pro veredito com histerese — antes dos renders. */
+  Object.keys(nowMap).forEach(function(t){ if (t !== me.token) clearOut(roomId, t); });
+  sweepPresence(roomId);
   /* entradas e saídas (sons só na sala aberta) */
   Object.keys(nowMap).forEach(function(t){
     if (!before[t] && t !== me.token && S.currentRoom === roomId){
@@ -1773,8 +1942,14 @@ function onPresence(roomId, metas){
     if (!nowMap[t] && t !== me.token && S.currentRoom === roomId && !hbFresh(roomId, t)) SoundFX.play('exit');
   });
   /* auto-cura: eu estou NESTA sala, não estou invisível, e o sync não
-     me lista → meu track se perdeu (rejoin): re-anuncia na hora. */
-  if (S.currentRoom === roomId && me.estado !== 'invisible' && !nowMap[me.token]) trackMe(roomId);
+     me lista → meu track se perdeu (rejoin): re-anuncia na hora.
+     MAS página ESCONDIDA não se cura: esconder foi saída anunciada
+     (sayBye + untrack) — curar aqui ressuscitava quem acabou de sair
+     no mapa de presença de todo mundo, e o status voltava a "online"
+     pra quem tinha ido embora (achado da v1.4.4). Voltar pra aba já
+     re-anuncia pelo visibilitychange/heartbeat. */
+  if (S.currentRoom === roomId && me.estado !== 'invisible' && !nowMap[me.token]
+      && document.visibilityState !== 'hidden') trackMe(roomId);
   if (S.currentRoom === roomId) renderRoom();
   renderHall();
 }
@@ -1813,14 +1988,18 @@ function onEvent(roomId, type, p){
     /* saída anunciada (v1.4.2): apaga o carimbo de vida e o mapa de
        presença — a pessoa consta FORA na hora, sem esperar o próximo
        sync nem o heartbeat esfriar (60–90s). As poltronas e o status
-       da porta atualizam no render ao fim deste onEvent. */
+       da porta atualizam no render ao fim deste onEvent.
+       (v1.4.4: markOut cola a saída no veredito — nem um last_seen
+       ainda fresco no banco ressuscita quem anunciou que saiu.) */
     if (S.lastHb[roomId]) delete S.lastHb[roomId][p.from];
     if (S.presence[roomId]) delete S.presence[roomId][p.from];
+    markOut(roomId, p.from);
   } else if (type === 'hb'){
     /* heartbeat de presença (a cada ~20s de quem está na sala):
        carimba a última vez que a pessoa foi vista DE VERDADE */
     var wasP = isPresent(roomId, p.from);
     var prevEst = personDisplay(roomId, p.from).estado;
+    clearOut(roomId, p.from);   /* hb é prova nova: descola a saída (v1.4.4) */
     (S.lastHb[roomId] = S.lastHb[roomId] || {})[p.from] = { at: Date.now(), estado: p.estado || 'online' };
     if (S.currentRoom === roomId && (wasP !== isPresent(roomId, p.from) || prevEst !== (p.estado || 'online'))) renderRoom();
   } else if (type === 'roommeta'){
@@ -1861,6 +2040,7 @@ function removeRoomLocal(roomId){
   S.rooms = S.rooms.filter(function(r){ return r.id !== roomId; });
   delete S.myMembers[roomId]; delete S.members[roomId]; delete S.presence[roomId];
   delete S.lastHb[roomId]; delete S.roomPhotoV[roomId];
+  delete S.outAt[roomId]; delete S.presV[roomId]; delete S.popDone[roomId];
   delete S.pins[roomId]; delete S.photos[roomId]; delete S.speech[roomId];
   delete S.whispers[roomId]; delete S.talkSeen[roomId];
   if (S.currentRoom === roomId){ S.currentRoom = null; showHall(); }
@@ -1877,6 +2057,10 @@ function refreshMembers(roomId){
       if (m.seat_x != null && m.seat_y != null)
         (S.seats[roomId] = S.seats[roomId] || {})[m.device_token] = { x: +m.seat_x, y: +m.seat_y };
     });
+    /* o GET de members é UMA leitura de dados pro veredito de
+       presença (v1.4.4): é aqui que o last_seen de todo mundo entra
+       na conta — antes dos renders, pra porta e sala lerem igual. */
+    sweepPresence(roomId);
     if (S.currentRoom === roomId) renderRoom();
     renderHall();
   }).catch(function(){});
@@ -1934,12 +2118,36 @@ function sayBye(){
   try { DB.broadcast(roomId, 'bye', { from: me.token }); } catch(e){}
   DB.untrack(roomId, me.token);
 }
+/* ============ carimbo no banco (v1.4.4) ============
+   Dentro da sala com a página visível, carimbo meu last_seen a
+   cada 15s (entrar/15s/voltar pra aba). Ao esconder ou fechar,
+   gravo a SENTINELA com fetch keepalive: é o "saí" que sobrevive
+   ao pagehide — quem lê me vê fora em segundos, sem depender do
+   WebSocket que o celular acabou de matar. Fantasma (invisível)
+   não carimba: presença escondida continua escondida. */
+var SEEN_MS = 15000, MEMBERS_POLL_MS = 10000;
+function touchSeen(roomId, sentinel){
+  if (!roomId || !DB || !DB.touchSeen) return;
+  if (!sentinel && me.estado === 'invisible') return;
+  var iso = sentinel ? SEEN_SENTINEL_ISO : new Date().toISOString();
+  var mine = memberOf(roomId, me.token); if (mine) mine.last_seen = iso;
+  if (S.myMembers[roomId]) S.myMembers[roomId].last_seen = iso;
+  try { DB.touchSeen(roomId, iso, !!sentinel).catch(function(){}); } catch(e){}
+}
 setInterval(heartbeatNow, HB_MS);
+setInterval(function(){
+  if (S.currentRoom && document.visibilityState === 'visible') touchSeen(S.currentRoom, false);
+}, SEEN_MS);
+/* sondagem de members (10s): a rede de segurança da presença nova —
+   recolhe last_seen de todo mundo mesmo se o socket dormiu */
+setInterval(function(){
+  if (S.currentRoom) refreshMembers(S.currentRoom);
+}, MEMBERS_POLL_MS);
 document.addEventListener('visibilitychange', function(){
-  if (document.visibilityState === 'visible') heartbeatNow();
-  else sayBye();
+  if (document.visibilityState === 'visible'){ heartbeatNow(); touchSeen(S.currentRoom, false); }
+  else { sayBye(); touchSeen(S.currentRoom, true); }
 });
-window.addEventListener('pagehide', sayBye);
+window.addEventListener('pagehide', function(){ sayBye(); touchSeen(S.currentRoom, true); });
 window.addEventListener('focus', heartbeatNow);
 window.addEventListener('pageshow', heartbeatNow);
 
@@ -1965,9 +2173,28 @@ function markTalkSeen(roomId, id){ (S.talkSeen[roomId] = S.talkSeen[roomId] || {
 function pushSpeechLine(roomId, token, line){
   var map = (S.speech[roomId] = S.speech[roomId] || {});
   var sp = map[token] || (map[token] = { lines: [], lastAt: 0 });
+  if (line.cts == null) line.cts = Date.now();
   sp.lines.push(line);
+  /* ORDEM DA CONVERSA (v1.4.4): a pilha vive em ordem de criação
+     (created_at; desempate pelo id) — numa sequência rápida A,B,A,B
+     as linhas não embaralham quando as vias chegam fora de ordem. */
+  sp.lines.sort(function(a, b){
+    var d = (a.cts || 0) - (b.cts || 0);
+    if (d) return d;
+    var ka = String(a.id || a.lid || ''), kb = String(b.id || b.lid || '');
+    return ka < kb ? -1 : (ka > kb ? 1 : 0);
+  });
   while (sp.lines.length > 3) sp.lines.shift();
   sp.lastAt = Date.now();
+}
+/* o pop de uma linha remota toca UMA vez por id: quem governa o som
+   é o dedupe — catch-up e sondagem NUNCA repetem o pop de uma linha
+   que este aparelho já viu (v1.4.4). */
+function popOnce(roomId, key){
+  var m = (S.popDone[roomId] = S.popDone[roomId] || {});
+  if (m[key]) return false;
+  m[key] = 1;
+  return true;
 }
 function pushSpeech(roomId, token, text, mine){
   /* caminho de RECEPÇÃO antigo (broadcast 'say'): mantido só pra
@@ -2041,7 +2268,8 @@ function adoptOwnTalk(roomId, row, texto, exp){
       if (!l.id && l.st && l.text === texto){ l.id = row.id; l.st = 'ok'; l.exp = exp; return; }
     }
   }
-  pushSpeechLine(roomId, me.token, { id: row.id, lid: uuid(), text: texto, exp: exp, st: 'ok' });
+  var cts = new Date(row.created_at).getTime();
+  pushSpeechLine(roomId, me.token, { id: row.id, lid: uuid(), cts: isNaN(cts) ? Date.now() : cts, text: texto, exp: exp, st: 'ok' });
 }
 /* UMA row da talk chegou (via rápida, catch-up ou sondagem): funde
    no estado local. É o ÚNICO funil de recepção da fala nova. */
@@ -2058,18 +2286,20 @@ function onTalkRow(roomId, row){
     return;
   }
   stampLife(roomId, row.author_token);             /* quem falou ESTÁ aqui (regra da v1.4.1) */
+  var cts = new Date(row.created_at).getTime();
+  if (isNaN(cts)) cts = Date.now();
   if (row.pra_token){
     if (row.pra_token !== me.token) return;        /* sussurro pra outro: invisível neste aparelho */
     (S.whispers[roomId] = S.whispers[roomId] || {})[row.author_token] =
       { id: row.id, text: texto, exp: exp, fromMe: false };
     if (S.currentRoom === roomId){
-      SoundFX.play('pop');
+      if (popOnce(roomId, row.id)) SoundFX.play('pop');
       toast('🤫', '<b>' + esc(row.author_name || 'Alguém') + '</b> sussurrou pra você');
     }
   } else {
-    pushSpeechLine(roomId, row.author_token, { id: row.id, text: texto, exp: exp });
+    pushSpeechLine(roomId, row.author_token, { id: row.id, cts: cts, text: texto, exp: exp });
     S.lastTalkAt[roomId] = Date.now();
-    if (S.currentRoom === roomId) SoundFX.play('pop');
+    if (S.currentRoom === roomId && popOnce(roomId, row.id)) SoundFX.play('pop');
     renderHall();
   }
   if (S.currentRoom === roomId) renderRoom();
@@ -2170,7 +2400,9 @@ function renderHall(){
     var st = doorStatus(room.id);
     var faces = members.slice(0, MAX_SEATS).map(function(m){
       var d = personDisplay(room.id, m.device_token);
-      var inp = !!pres[m.device_token];
+      /* porta e sala leem o MESMO veredito (v1.4.4): nada de a porta
+         dizer "dentro" e a poltrona mostrar a jaqueta */
+      var inp = isPresent(room.id, m.device_token);
       return '<span class="mini-face' + (inp ? '' : ' absent') + '" style="background:' + esc(d.color) + '" title="' + esc(d.name) + '">'
         + esc(d.ini) + '<span class="dot ' + esc((PRES_META[d.estado] || PRES_META.offline).dot) + '"></span></span>';
     }).join('');
@@ -2204,23 +2436,32 @@ function enterRoom(roomId){
   var room = roomById(roomId);
   if (!room) return;
   SoundFX.unlock();
-  if (S.currentRoom && S.currentRoom !== roomId) DB.untrack(S.currentRoom, me.token);
+  if (S.currentRoom && S.currentRoom !== roomId){
+    DB.untrack(S.currentRoom, me.token);
+    touchSeen(S.currentRoom, true);   /* a sala antiga fica sabendo que eu saí (v1.4.4) */
+  }
   S.currentRoom = roomId;
   el('viewHall').style.display = 'none';
   el('viewRoom').style.display = '';
   el('roomName').textContent = (room.emoji || '🚪') + ' ' + room.name;
   trackMe(roomId);
+  touchSeen(roomId, false);   /* meu carimbo no banco nasce com a entrada */
+  /* ORDEM GARANTIDA (v1.4.4): o primeiro render da sala sai SÓ com os
+     members frescos do GET — ninguém nasce jaqueta por um frame.
+     (o refreshMembers já renderiza no fim; aqui vai o push de entrada) */
   refreshMembers(roomId).then(function(){ notifyEnter(roomId); });
   refreshPins(roomId);
   refreshPhotos(roomId);
   refreshTalk(roomId);   /* catch-up: a conversa dos últimos 3 min me alcança */
-  renderRoom();
   updateSky();
   setTimeout(function(){ focusOn(me.token); }, 60);
   setTimeout(function(){ maybePushPrompt(roomId); }, 1400);
 }
 function leaveToHall(){
-  if (S.currentRoom) DB.untrack(S.currentRoom, me.token);
+  if (S.currentRoom){
+    DB.untrack(S.currentRoom, me.token);
+    touchSeen(S.currentRoom, true);   /* sair pra porta também é saída (v1.4.4) */
+  }
   S.currentRoom = null;
   closeSheet();
   showHall();
@@ -2274,8 +2515,11 @@ function balloonHtml(roomId, token){
   var minExp = Math.min.apply(null, lines.map(function(l){ return l.exp; }));
   var mine = token === me.token;
   var inner = lines.map(function(l){
+    /* minhas linhas carregam o lid estável no DOM (v1.4.4): na troca
+       ⏳→✓ a linha é a MESMA — só o selo muda, o texto não pisca */
     var attrs = ' class="bline"';
-    if (mine && l.st === 'fail' && l.lid) attrs = ' class="bline fail" data-retry="' + esc(l.lid) + '"';
+    if (mine && l.lid) attrs += ' data-lid="' + esc(l.lid) + '"';
+    if (mine && l.st === 'fail' && l.lid) attrs = ' class="bline fail" data-lid="' + esc(l.lid) + '" data-retry="' + esc(l.lid) + '"';
     return '<div' + attrs + '>' + esc(l.text) + (mine ? talkMark(l) : '') + '</div>';
   }).join('');
   return '<div class="balloon' + (mine ? ' mine' : '') + '" data-lines="' + lines.length + '">'
@@ -2290,6 +2534,11 @@ function whisperHtml(roomId, token){
     + (w.fromMe ? talkMark(w) : '')
     + '<span class="cd">sussurro · ' + cdText(w.exp) + '</span></div>';
 }
+/* sussurro vivo envolvendo este token (dela pra mim, ou meu pra ela) */
+function whisperAlive(roomId, token){
+  var w = (S.whispers[roomId] || {})[token];
+  return !!w && w.exp > Date.now();
+}
 function charHtml(roomId, token, idx){
   var d = personDisplay(roomId, token);
   var present = isPresent(roomId, token);
@@ -2299,15 +2548,22 @@ function charHtml(roomId, token, idx){
   var onStage = stage.indexOf(token) >= 0;
   var speaking = liveSpeakers(roomId).indexOf(token) >= 0;
   var burst = (S.bursts[roomId] || {})[token];
+  /* BALÃO DESACOPLADO DO SELO (v1.4.4): quem tem fala viva (ou
+     sussurro vivo comigo) mostra cabeça + balão MESMO se o veredito
+     de presença disser "fora" — a fala É a prova de que ela está
+     aqui (o caso da Akauana: escrevendo, e a poltrona de jaqueta).
+     Jaqueta, agora, é só pra quem está fora E em silêncio. */
+  var hasLive = speaking || whisperAlive(roomId, token);
+  var showHead = (present || hasLive) && !ghostMe;
   var bal = '';
-  if (present && !ghostMe){
+  if (showHead){
     bal += whisperHtml(roomId, token);
     if (speaking && (token === me.token || onStage)) bal += balloonHtml(roomId, token);
   }
-  var chip = (present && speaking && token !== me.token && !onStage)
+  var chip = (hasLive && speaking && token !== me.token && !onStage)
     ? '<span class="talk-chip" data-chip="' + esc(token) + '">💬</span>' : '';
   var inner;
-  if (!present || ghostMe){
+  if (!showHead){
     inner = '<div class="bal-col"></div>'
       + '<div class="seatwrap">' + chairSVG(d.color) + '<span class="jacket">🧥</span></div>'
       + '<div class="fora-name">' + esc(d.name) + ' · fora</div>';
@@ -2320,7 +2576,7 @@ function charHtml(roomId, token, idx){
       + (burst && burst.until > Date.now() ? '<div class="sig-burst">' + esc(burst.emoji) + '</div>' : '')
       + '<div class="under-name"><span class="dot ' + esc((PRES_META[d.estado] || PRES_META.online).dot) + '"></span>' + esc(d.name) + '</div>';
   }
-  return '<div class="char' + (present && !ghostMe ? '' : ' fora') + '" data-token="' + esc(token) + '" '
+  return '<div class="char' + (showHead ? '' : ' fora') + '" data-token="' + esc(token) + '" '
     + 'style="left:' + pos.x + '%;top:' + pos.y + '%">'
     + '<div class="char-shadow"></div><div class="char-inner">' + inner + '</div></div>';
 }
@@ -2928,7 +3184,7 @@ function say(text){
   /* v1.4.3: a linha nasce otimista no balão e viaja pela talk —
      o INSERT confirma (✓) ou a linha pede novo toque. O push sai da
      AÇÃO de enviar (não da chegada), como sempre. */
-  var line = { lid: uuid(), text: text.slice(0, 140), exp: Date.now() + SPEECH_TTL, st: 'sending', tryN: 0 };
+  var line = { lid: uuid(), cts: Date.now(), text: text.slice(0, 140), exp: Date.now() + SPEECH_TTL, st: 'sending', tryN: 0 };
   pushSpeechLine(roomId, me.token, line);
   S.lastTalkAt[roomId] = Date.now();
   deliverTalk(roomId, line, null);
@@ -2943,7 +3199,7 @@ function sendWhisper(roomId, token, text){
   /* sussurro também é row da talk (pra_token = o alvo): só o aparelho
      dele renderiza. A vida é a da row (3 min), como a fala — o banco
      é o transporte, e o que o banco não guarda mais, não existe. */
-  var w = { lid: uuid(), text: String(text || '').slice(0, 140), exp: Date.now() + SPEECH_TTL, fromMe: true, st: 'sending', tryN: 0 };
+  var w = { lid: uuid(), cts: Date.now(), text: String(text || '').slice(0, 140), exp: Date.now() + SPEECH_TTL, fromMe: true, st: 'sending', tryN: 0 };
   (S.whispers[roomId] = S.whispers[roomId] || {})[token] = w;
   deliverTalk(roomId, w, token);
   SoundFX.play('popme');
@@ -3464,6 +3720,10 @@ el('joinCodeInput').addEventListener('keydown', function(ev){ if (ev.key === 'En
 /* ================= TICKER (1s) ================= */
 setInterval(function(){
   var changed = pruneEphemeral();
+  /* o ticker é a leitura periódica do veredito de presença (v1.4.4):
+     sem ele, uma ausência sem evento nenhum nunca viraria "fora" */
+  if (S.currentRoom) sweepPresence(S.currentRoom);
+  else S.rooms.forEach(function(r){ sweepPresence(r.id); });
   if (S.currentRoom){
     if (changed) renderRoom();
     else {
@@ -3505,6 +3765,7 @@ function boot(){
                  openSettings: openSettings, openRoomMenu: openRoomMenu, openMuralSheet: openMuralSheet,
                  renameRoom: renameRoom, setRoomPhotoFromDataUrl: setRoomPhotoFromDataUrl,
                  heartbeat: heartbeatNow, isPresent: isPresent,
+                 refreshMembers: refreshMembers, touchSeen: touchSeen,
                  refreshTalk: refreshTalk, retryTalkLine: retryTalkLine, onTalkRow: onTalkRow,
                  push: { supported: pushSupported, enable: enablePush, disable: disablePush,
                          subscription: pushSubscription, notifyRoom: notifyRoom, updateBtn: updatePushBtn },
