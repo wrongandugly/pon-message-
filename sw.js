@@ -2,7 +2,7 @@
    PON — service worker (arquivo de verdade, na raiz do repo)
    Faz duas coisas:
    1) PUSH: recebe o aviso da Edge Function "send-push" e mostra a
-      notificação do sistema. REGRA DE OURO (v2): na dúvida, MOSTRA.
+      notificação do sistema. REGRA DE OURO (v3 — icone novo, logica igual): na dúvida, MOSTRA.
       A supressão (app aberto e visível) é best-effort com timeout —
       qualquer erro, demora ou ambiente estranho (iOS) cai no fallback
       de mostrar, nunca no silêncio.
