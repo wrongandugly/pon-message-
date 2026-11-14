@@ -275,7 +275,35 @@
     background:radial-gradient(ellipse at center, rgba(96,54,20,.38), rgba(96,54,20,0) 68%);
     transition:all .25s ease;
   }
-  .char.dragging .char-shadow{ width:84px; height:15px; opacity:.55; }
+  /* alvos do modo-troca (v1.4.5): âncoras livres pulsam no palco */
+  .seat-target{
+    position:absolute; width:84px; transform:translate(-50%,-100%); z-index:40;
+    text-align:center; cursor:pointer; pointer-events:auto; line-height:1.15;
+  }
+  .seat-target .st-ring{
+    display:block; width:64px; height:64px; margin:0 auto; border-radius:50%;
+    border:3px dashed #2f7fc4; background:rgba(88,170,240,.16);
+    animation:seatPulse 1.1s ease-in-out infinite;
+  }
+  .seat-target em{
+    display:inline-block; font-style:normal; font-size:10.5px; font-weight:800; color:#1d5c94;
+    background:rgba(255,255,255,.92); border-radius:9px; padding:2px 7px; margin-top:3px;
+    box-shadow:0 2px 6px rgba(30,80,130,.25);
+  }
+  .seat-target.mine .st-ring{ border-color:#b3852f; background:rgba(246,191,79,.18); animation:none; }
+  .seat-target.mine em{ color:#7a5410; }
+  @keyframes seatPulse{ 0%,100%{ transform:scale(1); opacity:.85; } 50%{ transform:scale(1.09); opacity:1; } }
+  .swap-bar{
+    display:none; align-items:center; gap:10px; margin-top:10px;
+    background:#eaf5ff; border:2px solid #9cc8ef; border-radius:14px; padding:9px 12px;
+    font-size:13.5px; font-weight:700; color:#1d5c94;
+  }
+  .swap-bar.show{ display:flex; }
+  .swap-bar button{
+    margin-left:auto; border:none; border-radius:11px; padding:7px 13px; cursor:pointer;
+    background:#fff; color:#1d5c94; font-size:13px; font-weight:800;
+    box-shadow:0 2px 6px rgba(30,80,130,.18);
+  }
   .sky-win{
     position:absolute; left:20px; top:18px; width:96px; height:82px; border-radius:10px;
     border:5px solid #a5713f; overflow:hidden; box-shadow:inset 0 0 12px rgba(0,0,0,.15);
@@ -334,13 +362,11 @@
   /* poltronas + bonecos */
   #roomChars{ position:absolute; inset:0; z-index:10; pointer-events:none; }
   .char{
-    position:absolute; width:84px; text-align:center; cursor:grab; pointer-events:auto;
+    position:absolute; width:84px; text-align:center; cursor:pointer; pointer-events:auto;
     transform:translate(-50%,-100%);
     transition:left 1.2s ease, top 1.2s ease;
-    touch-action:none; user-select:none; -webkit-user-select:none;
+    user-select:none; -webkit-user-select:none;
   }
-  .char.dragging{ transition:none; cursor:grabbing; z-index:60; }
-  .char.dragging .char-inner{ transform:scale(1.06); }
   .char-inner{ display:flex; flex-direction:column; align-items:center; animation:bob 3.4s ease-in-out infinite; transition:transform .2s ease; }
   @keyframes bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-2px); } }
   .char.shake .char-inner{ animation:nudgeShake .7s ease-in-out 2; }
@@ -727,6 +753,7 @@
         <div id="roomChars"></div>
         <div class="ghost-note" id="ghostNote">👻 você está invisível — espiando pela janela</div>
       </div>
+      <div class="swap-bar" id="swapBar"><span>🪑 trocar de lugar — toca numa poltrona livre</span><button id="swapCancel" type="button">cancelar</button></div>
       <div class="alone-card" id="aloneCard">
         <div class="alone-txt">Ninguém por aqui agora.<br>Deixa um recado no mural pra quem chegar depois 📌</div>
         <button id="btnAloneMural" type="button">📌 Abrir o mural</button>
@@ -834,7 +861,7 @@
 var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
 var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
 var PUSH_FN_URL = SB_URL + '/functions/v1/send-push';
-var APP_VERSION = '1.4.4';   /* exibida nas Configurações */
+var APP_VERSION = '1.4.5';   /* exibida nas Configurações */
 /* chave pública VAPID de mentira, só pro adaptador fake (a de verdade
    nasce dentro da Edge Function e nunca aparece em arquivo) */
 var FAKE_VAPID = 'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks';
@@ -853,9 +880,18 @@ var PRES_META = {
   invisible:{ dot:'invisible',label:'Invisível' },
   offline:  { dot:'offline',  label:'Fora da sala' }
 };
-var SEAT_SLOTS = [
-  {x:50,y:95},{x:28,y:90},{x:72,y:90},{x:12,y:81},{x:88,y:81},{x:50,y:79}
+/* ============ MESA DE PÔQUER (v1.4.5) ============
+   Fim do arrasto: as poltronas moram em 6 ÂNCORAS desenhadas num
+   arco semicircular ao redor da mesinha (0 = ponta esquerda,
+   5 = ponta direita). O assento é estado compartilhado
+   (members.seat); sem seat salvo, a atribuição é determinística
+   e centro-pra-fora: preferência 2,3,1,4,0,5 — o casal cai nas
+   duas do meio, o trio fica centrado, a sala cheia usa o arco
+   todo. Todo cliente calcula o MESMO mapa dos MESMOS dados. */
+var SEAT_ANCHORS = [
+  {x:12,y:81},{x:28,y:90},{x:43,y:95},{x:57,y:95},{x:72,y:90},{x:88,y:81}
 ];
+var SEAT_PREF = [2, 3, 1, 4, 0, 5];
 
 /* ---------------- utilidades ---------------- */
 function el(id){ return document.getElementById(id); }
@@ -980,9 +1016,12 @@ function propFor(estado){
 
 /* ---------------- foto de perfil (avatar) ----------------
    Arquivo determinístico no bucket público "photos":
-   avatars/<device_token>.jpg (sobrescreve). Sem coluna nova:
-   a URL se deriva do token do membro e a versão (timestamp do
-   upload) viaja no Presence e fica no meu localStorage. */
+   avatars/<device_token>.jpg (sobrescreve). A versão (timestamp
+   do upload) mora no banco — members.foto_v (v1.4.5): sem ela,
+   nada avisava os outros da foto nova/trocada, e o navegador
+   deles servia o 404 antigo ou a imagem velha pra sempre.
+   Com foto_v, a URL ganha ?v=<carimbo> e o cache fura sozinho.
+   Pro meu próprio aparelho, me.avatar_v (localStorage) espelha. */
 function avatarUrl(token, v){
   if (!token || !v) return '';
   return SB_URL + '/storage/v1/object/public/photos/avatars/' + token + '.jpg?v=' + v;
@@ -1237,8 +1276,20 @@ function createFakeAdapter(){
       return Promise.resolve(clone(store.members.filter(function(m){ return m.room_id === roomId; })));
     },
     updateMember: function(roomId, token, patch){
+      /* como no backend de verdade, TODO UPDATE em members chega
+         aos outros inscritos como postgres_changes — é por essa via
+         que seat (v1.4.5) e os meta de alguém se propagam */
       store.members.forEach(function(m){
-        if (m.room_id === roomId && m.device_token === token) Object.assign(m, patch);
+        if (m.room_id === roomId && m.device_token === token){ Object.assign(m, patch); emitMemberRow(m, clientId); }
+      });
+      return Promise.resolve(true);
+    },
+    /* foto de perfil (v1.4.5): o carimbo foto_v vai pra TODAS as
+       minhas linhas de uma vez (todas as salas) e cada sala avisa
+       os seus inscritos — a foto nasce/troca na tela dos outros */
+    stampFotoV: function(token, v){
+      store.members.forEach(function(m){
+        if (m.device_token === token){ m.foto_v = v; emitMemberRow(m, clientId); }
       });
       return Promise.resolve(true);
     },
@@ -1535,6 +1586,11 @@ function createRealAdapter(){
     updateMember: function(roomId, token, patch){
       return rows(sb.from('members').update(patch).eq('room_id', roomId).eq('device_token', token)).then(function(){ return true; });
     },
+    /* foto de perfil (v1.4.5): UM PATCH por device_token carimba
+       foto_v em TODAS as minhas salas de uma vez */
+    stampFotoV: function(token, v){
+      return rows(sb.from('members').update({ foto_v: v }).eq('device_token', token)).then(function(){ return true; });
+    },
     /* presença pelo banco (v1.4.4): PATCH do MEU last_seen. Na saída
        (keepalive), o fetch cru com keepalive:true é quem sobrevive ao
        pagehide — o cliente do supabase-js pode ser morto no caminho. */
@@ -1702,7 +1758,7 @@ var S = {
   whispers: {},         /* roomId -> { outroToken: {id?,lid?,text, exp, fromMe, st?} } */
   talkSeen: {},         /* roomId -> { rowId: 1 } — dedupe das vias da fala (v1.4.3) */
   stageForce: {},       /* roomId -> token forçado ao palco */
-  seats: {},            /* roomId -> { token: {x,y} } */
+  swapMode: false,      /* modo-troca de lugar aberto (v1.4.5) */
   lastTalkAt: {},       /* roomId -> ts da última fala (qualquer um) */
   bursts: {},           /* roomId -> { token: {emoji, until} } */
   lastHb: {},           /* roomId -> { token: {at, estado} } — heartbeat recente (broadcast 'hb') */
@@ -1821,7 +1877,11 @@ function personDisplay(roomId, token){
     frase: p.frase != null ? p.frase : (base.frase || ''),
     estado: estado,
     color: p.color || base.color || '#888',
-    avatar_v: token === me.token ? (me.avatar_v || 0) : (p.avatar_v || 0),
+    /* a versão da foto mora no BANCO (members.foto_v, v1.4.5): é ela
+       que fura o cache dos outros — subiu o carimbo, muda a URL,
+       a foto nasce/troca sem recarregar. Sem foto_v (fotos antigas),
+       vale o avatar_v do Presence, como antes. */
+    avatar_v: token === me.token ? (me.avatar_v || 0) : (base.foto_v != null ? base.foto_v : (p.avatar_v || 0)),
     ini: iniOf(p.name || base.name || '?')
   };
 }
@@ -1850,11 +1910,50 @@ function isPresent(roomId, token){
   }
   return true;
 }
-function seatPos(roomId, token, idx){
-  var sm = S.seats[roomId] || {};
-  if (sm[token]) return sm[token];
-  var slot = SEAT_SLOTS[idx % SEAT_SLOTS.length];
-  return { x: slot.x, y: slot.y };
+/* a lista de membros da sala como o render a enxerga: eu sempre
+   tenho cadeira (minha linha entra mesmo se o GET ainda não a tem),
+   ordem estável por chegada (desempate pelo token). */
+function roomMembers(roomId){
+  var members = (S.members[roomId] || []).slice();
+  if (!members.some(function(m){ return m.device_token === me.token; }) && S.myMembers[roomId])
+    members.unshift(S.myMembers[roomId]);
+  members.sort(function(a, b){
+    var c = String(a.created_at).localeCompare(String(b.created_at));
+    return c !== 0 ? c : String(a.device_token).localeCompare(String(b.device_token));
+  });
+  return members;
+}
+/* o mapa token -> âncora, calculado dos dados compartilhados:
+   1ª passada: seat SALVO vence (se livre); 2ª passada: quem não
+   tem cai na âncora livre mais perto do centro (SEAT_PREF). */
+function computeSeatMap(roomId){
+  var members = roomMembers(roomId).slice(0, MAX_SEATS);
+  var taken = {}, map = {};
+  members.forEach(function(m){
+    var s = (m.seat != null && isFinite(+m.seat) && +m.seat >= 0 && +m.seat < SEAT_ANCHORS.length) ? +m.seat : null;
+    if (s !== null && !taken[s]){ map[m.device_token] = s; taken[s] = 1; }
+  });
+  members.forEach(function(m){
+    if (map[m.device_token] != null) return;
+    for (var i = 0; i < SEAT_PREF.length; i++){
+      var a = SEAT_PREF[i];
+      if (!taken[a]){ map[m.device_token] = a; taken[a] = 1; break; }
+    }
+  });
+  return map;
+}
+function seatAnchorOf(roomId, token){
+  var a = computeSeatMap(roomId)[token];
+  return a != null ? a : SEAT_PREF[0];
+}
+function seatPos(roomId, token){
+  return SEAT_ANCHORS[seatAnchorOf(roomId, token)];
+}
+/* o LEQUE dos balões: a âncora inclina o balão pra fora do centro
+   (esquerda puxa pra esquerda, direita pra direita, centro reto) */
+function fanOf(anchor){
+  var lean = anchor - (SEAT_ANCHORS.length - 1) / 2;   /* -2.5 .. +2.5 */
+  return { fx: Math.round(lean * 6), fr: Math.round(lean * 14) / 10 };
 }
 function inviteLink(room){
   return location.origin + location.pathname + '#c/' + room.invite_code;
@@ -1899,8 +1998,8 @@ function onMemberRow(roomId, row){
   if (mem) Object.assign(mem, row); else list.push(row);
   var mine = S.myMembers[roomId];
   if (mine && row.device_token === me.token) S.myMembers[roomId] = mem || row;
-  if (row.seat_x != null && row.seat_y != null)
-    (S.seats[roomId] = S.seats[roomId] || {})[row.device_token] = { x: +row.seat_x, y: +row.seat_y };
+  /* seat e foto_v NÃO precisam de tradução: a fusão acima já os traz,
+     e o render os lê da linha (mapa de assentos / URL do avatar) */
   if (row.device_token === me.token) return;   /* meu eco: só funde, não me julgo pelo banco */
   var t = row.last_seen ? new Date(row.last_seen).getTime() : 0;
   if (t > 0 && t < SEEN_REAL_MIN_MS) markOut(roomId, row.device_token);        /* sentinela = saiu */
@@ -2009,8 +2108,6 @@ function onEvent(roomId, type, p){
     if (p.photo_v) S.roomPhotoV[roomId] = p.photo_v;
     if (rmx && S.currentRoom === roomId) el('roomName').textContent = (rmx.emoji || '🚪') + ' ' + rmx.name;
     renderHall();
-  } else if (type === 'seat'){
-    (S.seats[roomId] = S.seats[roomId] || {})[p.from] = { x: p.x, y: p.y };
   } else if (type === 'meta'){
     var mem = memberOf(roomId, p.from);
     if (mem){ mem.name = p.name; mem.handle = p.handle; mem.frase = p.frase; mem.estado = p.estado; mem.color = p.color; }
@@ -2052,10 +2149,6 @@ function refreshMembers(roomId){
     S.members[roomId] = list.filter(function(m){
       if (!m || !m.device_token || seenTok[m.device_token]) return false;
       seenTok[m.device_token] = 1; return true;
-    });
-    list.forEach(function(m){
-      if (m.seat_x != null && m.seat_y != null)
-        (S.seats[roomId] = S.seats[roomId] || {})[m.device_token] = { x: +m.seat_x, y: +m.seat_y };
     });
     /* o GET de members é UMA leitura de dados pro veredito de
        presença (v1.4.4): é aqui que o last_seen de todo mundo entra
@@ -2441,6 +2534,7 @@ function enterRoom(roomId){
     touchSeen(S.currentRoom, true);   /* a sala antiga fica sabendo que eu saí (v1.4.4) */
   }
   S.currentRoom = roomId;
+  S.swapMode = false;   /* modo-troca não atravessa salas (v1.4.5) */
   el('viewHall').style.display = 'none';
   el('viewRoom').style.display = '';
   el('roomName').textContent = (room.emoji || '🚪') + ' ' + room.name;
@@ -2463,6 +2557,7 @@ function leaveToHall(){
     touchSeen(S.currentRoom, true);   /* sair pra porta também é saída (v1.4.4) */
   }
   S.currentRoom = null;
+  S.swapMode = false;
   closeSheet();
   showHall();
 }
@@ -2539,11 +2634,13 @@ function whisperAlive(roomId, token){
   var w = (S.whispers[roomId] || {})[token];
   return !!w && w.exp > Date.now();
 }
-function charHtml(roomId, token, idx){
+function charHtml(roomId, token, anchor){
   var d = personDisplay(roomId, token);
   var present = isPresent(roomId, token);
   var ghostMe = token === me.token && me.estado === 'invisible';
-  var pos = seatPos(roomId, token, idx);
+  if (anchor == null) anchor = seatAnchorOf(roomId, token);
+  var pos = SEAT_ANCHORS[anchor];
+  var fan = fanOf(anchor);
   var stage = computeStage(roomId);
   var onStage = stage.indexOf(token) >= 0;
   var speaking = liveSpeakers(roomId).indexOf(token) >= 0;
@@ -2568,7 +2665,7 @@ function charHtml(roomId, token, idx){
       + '<div class="seatwrap">' + chairSVG(d.color) + '<span class="jacket">🧥</span></div>'
       + '<div class="fora-name">' + esc(d.name) + ' · fora</div>';
   } else {
-    inner = '<div class="bal-col">' + bal + '</div>'
+    inner = '<div class="bal-col" style="transform:translateX(' + fan.fx + 'px) rotate(' + fan.fr + 'deg)">' + bal + '</div>'
       + chip
       + '<div class="seatwrap">' + chairSVG(d.color)
       + '<div class="headwrap ' + ringCls(d.estado) + '">' + headSVG(d.ini, d.color) + avatarImgHtml(token, d.avatar_v, 'head-photo') + '</div>'
@@ -2577,29 +2674,35 @@ function charHtml(roomId, token, idx){
       + '<div class="under-name"><span class="dot ' + esc((PRES_META[d.estado] || PRES_META.online).dot) + '"></span>' + esc(d.name) + '</div>';
   }
   return '<div class="char' + (showHead ? '' : ' fora') + '" data-token="' + esc(token) + '" '
+    + 'data-anchor="' + anchor + '" data-fx="' + fan.fx + '" data-fr="' + fan.fr + '" '
     + 'style="left:' + pos.x + '%;top:' + pos.y + '%">'
     + '<div class="char-shadow"></div><div class="char-inner">' + inner + '</div></div>';
 }
 function renderRoom(){
   var roomId = S.currentRoom; if (!roomId) return;
   var room = roomById(roomId);
-  var members = (S.members[roomId] || []).slice();
-  /* eu sempre tenho cadeira */
-  if (!members.some(function(m){ return m.device_token === me.token; }) && S.myMembers[roomId])
-    members.unshift(S.myMembers[roomId]);
-  members.sort(function(a,b){ return String(a.created_at).localeCompare(String(b.created_at)); });
-  el('roomChars').innerHTML = members.slice(0, MAX_SEATS).map(function(m, i){
-    return charHtml(roomId, m.device_token, i);
-  }).join('');
+  var members = roomMembers(roomId);
+  var smap = computeSeatMap(roomId);
+  el('roomChars').innerHTML = members.slice(0, MAX_SEATS).map(function(m){
+    return charHtml(roomId, m.device_token, smap[m.device_token]);
+  }).join('') + swapTargetsHtml(roomId, smap);
   el('coffeeMachine').innerHTML = coffeeSVG();
   renderCorkboard();
   var others = members.filter(function(m){ return m.device_token !== me.token; });
   var anyoneElseIn = others.some(function(m){ return isPresent(roomId, m.device_token); });
   el('aloneCard').classList.toggle('show', !anyoneElseIn);
   el('ghostNote').classList.toggle('show', me.estado === 'invisible');
-  /* bind: toque abre painel; arrastar move a poltrona */
+  el('swapBar').classList.toggle('show', !!S.swapMode);
+  /* bind: toque abre o painel da pessoa (arrastar morreu na v1.4.5) */
   var nodes = el('roomChars').querySelectorAll('.char');
   for (var i=0;i<nodes.length;i++) bindChar(nodes[i], roomId, members);
+  if (S.swapMode){
+    var tgts = el('roomChars').querySelectorAll('[data-seat-target]');
+    for (var t = 0; t < tgts.length; t++)
+      tgts[t].addEventListener('click', function(){ chooseSeat(parseInt(this.getAttribute('data-seat-target'), 10)); });
+    var myT = el('roomChars').querySelector('[data-seat-cancel]');
+    if (myT) myT.addEventListener('click', endSwapMode);
+  }
   var chips = el('roomChars').querySelectorAll('.talk-chip');
   for (var j=0;j<chips.length;j++){
     chips[j].addEventListener('click', function(ev){
@@ -2619,13 +2722,14 @@ function layoutBalloons(roomId, members){
     var node = nodes[i];
     var col = node.querySelector('.bal-col');
     if (!col) continue;
-    col.style.transform = '';
+    /* a base do transform é o LEQUE da âncora (v1.4.5); a elevação
+       anti-sobreposição soma por cima, sem apagar a inclinação */
+    var fanBase = 'translateX(' + (node.getAttribute('data-fx') || 0) + 'px) rotate(' + (node.getAttribute('data-fr') || 0) + 'deg)';
+    col.style.transform = fanBase;
     var bal = node.querySelector('.balloon');
     if (!bal) continue;
     var token = node.getAttribute('data-token');
-    var idx = 0;
-    members.forEach(function(m, k){ if (m.device_token === token) idx = k; });
-    var pos = seatPos(roomId, token, idx);
+    var pos = seatPos(roomId, token);
     var sp = (S.speech[roomId] || {})[token];
     var lines = sp ? sp.lines.filter(function(l){ return l.exp > Date.now(); }) : [];
     var dim = balloonDims(lines.length ? lines : [{ text: '' }]);
@@ -2639,7 +2743,7 @@ function layoutBalloons(roomId, members){
     while (hits(box) && guard < 12){
       lift += 14; box.t -= 14; box.b -= 14; guard++;
     }
-    if (lift) col.style.transform = 'translateY(' + (-lift) + 'px)';
+    if (lift) col.style.transform = fanBase + ' translateY(' + (-lift) + 'px)';
     placed.push(box);
   }
 }
@@ -2660,52 +2764,71 @@ function showBigSignal(emoji){
   setTimeout(function(){ w.classList.remove('show'); }, 1550);
 }
 
-/* ================= ARRASTAR POLTRONA ================= */
+/* ================= POLTRONA: TOQUE, NUNCA ARRASTO (v1.4.5) =================
+   O arrasto morreu: no celular, o dedo do arrasto brigava com o
+   scroll e com o toque de ver foto — a poltrona "não obedecia".
+   Agora a poltrona só se move por ESCOLHA: o mapa de âncoras
+   (computeSeatMap) ou o modo-troca. O toque no boneco segue
+   abrindo o painel da pessoa (fotos dela), como sempre. */
 function bindChar(node, roomId, members){
   var token = node.getAttribute('data-token');
-  var startX = 0, startY = 0, moved = false, pid = null;
+  var downX = 0, downY = 0;
   node.addEventListener('pointerdown', function(ev){
-    pid = ev.pointerId; moved = false;
-    startX = ev.clientX; startY = ev.clientY;
-    node.classList.add('dragging');
-    try { node.setPointerCapture(pid); } catch(e){}
+    downX = ev.clientX; downY = ev.clientY;
   });
-  node.addEventListener('pointermove', function(ev){
-    if (pid === null || ev.pointerId !== pid) return;
-    var dx = ev.clientX - startX, dy = ev.clientY - startY;
-    if (Math.abs(dx) + Math.abs(dy) > 7) moved = true;
-    if (!moved) return;
-    var stage = el('roomStage').getBoundingClientRect();
-    var x = clamp((ev.clientX - stage.left) / stage.width * 100, 9, 91);
-    var y = clamp((ev.clientY - stage.top) / stage.height * 100 + 6, 55, 98);
-    node.style.left = x + '%'; node.style.top = y + '%';
-    node.setAttribute('data-dx', x); node.setAttribute('data-dy', y);
+  node.addEventListener('pointerup', function(ev){
+    /* gesto longo (scroll/arrasto) NÃO é toque: não abre nada,
+       não move nada — a poltrona fica onde a âncora manda */
+    if (Math.abs(ev.clientX - downX) + Math.abs(ev.clientY - downY) > 10) return;
+    if (S.swapMode) return;   /* no modo-troca, quem manda são os alvos */
+    openPersonSheet(roomId, token);
   });
-  function finish(ev, cancelled){
-    if (pid === null) return;
-    node.classList.remove('dragging');
-    var wasDrag = moved && !cancelled;
-    pid = null;
-    if (wasDrag){
-      var x = parseFloat(node.getAttribute('data-dx')), y = parseFloat(node.getAttribute('data-dy'));
-      if (!isNaN(x) && !isNaN(y)){
-        (S.seats[roomId] = S.seats[roomId] || {})[token] = { x: Math.round(x), y: Math.round(y) };
-        if (token === me.token){
-          DB.updateMember(roomId, me.token, { seat_x: Math.round(x), seat_y: Math.round(y) }).catch(function(){});
-          DB.broadcast(roomId, 'seat', { from: me.token, x: Math.round(x), y: Math.round(y) });
-        } else {
-          /* arrastar o outro = a cutucada com as mãos: ele treme e a poltrona volta */
-          DB.broadcast(roomId, 'nudge', { from: me.token, to: token, name: me.name });
-          setTimeout(function(){ renderRoom(); }, 650);
-        }
-      }
-      renderRoom();
-    } else {
-      openPersonSheet(roomId, token);
-    }
+}
+
+/* ============ TROCAR DE LUGAR POR TOQUE (v1.4.5) ============
+   Entrada explícita (minha folha ou o menu ⚙️) — nada de gesto
+   escondido. No modo-troca, as âncoras livres ganham alvo pulsante
+   "toca pra sentar aqui"; a minha ganha "seu lugar" (tocar nela
+   ou em cancelar sai sem mudar). A escolha é um PATCH do meu
+   members.seat: os outros veem pelo UPDATE de members. */
+function swapTargetsHtml(roomId, smap){
+  if (!S.swapMode) return '';
+  var takenBy = {};
+  Object.keys(smap).forEach(function(t){ takenBy[smap[t]] = t; });
+  var h = '';
+  for (var a = 0; a < SEAT_ANCHORS.length; a++){
+    var occ = takenBy[a];
+    if (occ && occ !== me.token) continue;   /* ocupada: sem alvo */
+    var pos = SEAT_ANCHORS[a];
+    if (occ === me.token)
+      h += '<div class="seat-target mine" data-seat-cancel="1" style="left:' + pos.x + '%;top:' + pos.y + '%"><span class="st-ring"></span><em>seu lugar · toca pra ficar</em></div>';
+    else
+      h += '<div class="seat-target" data-seat-target="' + a + '" style="left:' + pos.x + '%;top:' + pos.y + '%"><span class="st-ring"></span><em>toca pra sentar aqui</em></div>';
   }
-  node.addEventListener('pointerup', function(ev){ finish(ev, false); });
-  node.addEventListener('pointercancel', function(ev){ finish(ev, true); });
+  return h;
+}
+function startSwapMode(){
+  if (!S.currentRoom) return;
+  closeSheet();
+  S.swapMode = true;
+  renderRoom();
+}
+function endSwapMode(){
+  if (!S.swapMode) return;
+  S.swapMode = false;
+  if (S.currentRoom) renderRoom();
+}
+function chooseSeat(anchor){
+  var roomId = S.currentRoom; if (!roomId) return;
+  anchor = +anchor;
+  if (!(anchor >= 0 && anchor < SEAT_ANCHORS.length)) return;
+  /* otimismo local: minha linha muda já e a poltrona desliza
+     (a transition de left/top anima); o PATCH confirma no banco */
+  var mine = S.myMembers[roomId]; if (mine) mine.seat = anchor;
+  var mem = memberOf(roomId, me.token); if (mem) mem.seat = anchor;
+  S.swapMode = false;
+  renderRoom();
+  DB.updateMember(roomId, me.token, { seat: anchor }).catch(function(){});
 }
 
 /* ================= PAINÉIS ================= */
@@ -2757,6 +2880,7 @@ function openPersonSheet(roomId, token){
         + '<button class="abtn danger" id="pRemove" type="button" style="width:100%">🚪 remover ' + esc(firstNameOf(d.name)) + ' desta sala</button>';
   } else {
     h += '<button class="abtn wave" id="pAvatarBtn" type="button" style="width:100%;margin-top:14px">📷 Foto de perfil</button>'
+      + '<button class="abtn wave" id="pSwapBtn" type="button" style="width:100%;margin-top:10px">🪑 Trocar de lugar</button>'
       + '<div class="sec-title">Suas fotos nesta sala <span>' + photoSpanTxt(roomId) + '</span></div>';
   }
   /* fotos da pessoa nesta sala */
@@ -2796,6 +2920,7 @@ function openPersonSheet(roomId, token){
     if (rm) rm.addEventListener('click', function(){ removeMember(roomId, token); });
   } else {
     el('pAvatarBtn').addEventListener('click', function(){ el('avatarFile').click(); });
+    el('pSwapBtn').addEventListener('click', function(){ startSwapMode(); });
     el('pCamBtn').addEventListener('click', function(){
       pendingCaption = el('pCaption').value.trim();
       el('photoFileCam').click();
@@ -2957,6 +3082,7 @@ function openRoomMenu(){
   var h = '<div class="sheet-name">⚙️ ' + esc(room.name) + '</div>'
     + '<div class="sheet-pres">código da sala: <b>' + esc(room.invite_code) + '</b></div>'
     + '<button class="abtn wave" id="rmInvite" type="button" style="width:100%;margin-top:14px">➕ convidar (ver link e código)</button>'
+    + '<button class="abtn wave" id="rmSwap" type="button" style="width:100%;margin-top:10px">🪑 trocar de lugar</button>'
     + '<button class="abtn wave" id="rmSettings" type="button" style="width:100%;margin-top:10px">⚙️ configurações do app</button>'
     + '<button class="abtn wave" id="rmLeave" type="button" style="width:100%;margin-top:10px">🚪 sair desta sala</button>';
   if (isOwner(room))
@@ -2969,6 +3095,7 @@ function openRoomMenu(){
   openSheet(h);
   bindClose();
   el('rmInvite').addEventListener('click', openInviteSheet);
+  el('rmSwap').addEventListener('click', function(){ startSwapMode(); });
   el('rmSettings').addEventListener('click', function(){ closeSheet(); openSettings(); });
   el('rmLeave').addEventListener('click', function(){ leaveRoom(roomId); });
   var rn = el('rmRename');
@@ -3427,8 +3554,18 @@ function setAvatarFromDataUrl(dataUrl){
     makeAvatarImage(dataUrl, function(small){
       var blob = dataUrlToBlob(small);
       DB.uploadAvatar(me.token, blob).then(function(){
-        me.avatar_v = Date.now();
+        var v = Date.now();
+        me.avatar_v = v;
         saveMe();
+        /* o arquivo sozinho não avisa ninguém (a URL é determinística
+           e o navegador dos outros guarda o 404/a foto velha): o
+           carimbo foto_v no banco é o aviso — UPDATE de members que
+           todo mundo já recebe (v1.4.5) */
+        Object.keys(S.myMembers).forEach(function(rid){ if (S.myMembers[rid]) S.myMembers[rid].foto_v = v; });
+        Object.keys(S.members).forEach(function(rid){
+          (S.members[rid] || []).forEach(function(m){ if (m.device_token === me.token) m.foto_v = v; });
+        });
+        if (DB.stampFotoV) DB.stampFotoV(me.token, v).catch(function(){});
         renderCanto();
         renderPsAvatar();
         propagateMeta(S.currentRoom);
@@ -3700,6 +3837,7 @@ document.addEventListener('pointerdown', function(){ SoundFX.unlock(); });
 el('btnHall').addEventListener('click', leaveToHall);
 el('btnInvite').addEventListener('click', openInviteSheet);
 el('btnRoomMenu').addEventListener('click', openRoomMenu);
+el('swapCancel').addEventListener('click', endSwapMode);
 el('btnSay').addEventListener('click', function(){ say(el('talkInput').value); });
 el('talkInput').addEventListener('keydown', function(ev){ if (ev.key === 'Enter') say(this.value); });
 el('vbTalk').addEventListener('click', function(){ el('talkInput').focus(); });
@@ -3767,6 +3905,8 @@ function boot(){
                  heartbeat: heartbeatNow, isPresent: isPresent,
                  refreshMembers: refreshMembers, touchSeen: touchSeen,
                  refreshTalk: refreshTalk, retryTalkLine: retryTalkLine, onTalkRow: onTalkRow,
+                 startSwapMode: startSwapMode, endSwapMode: endSwapMode, chooseSeat: chooseSeat,
+                 computeSeatMap: computeSeatMap, seatAnchorOf: seatAnchorOf,
                  push: { supported: pushSupported, enable: enablePush, disable: disablePush,
                          subscription: pushSubscription, notifyRoom: notifyRoom, updateBtn: updatePushBtn },
                  sound: SoundFX,
@@ -3775,8 +3915,6 @@ function boot(){
     S.rooms = data.rooms || [];
     (data.members || []).forEach(function(m){
       S.myMembers[m.room_id] = m;
-      if (m.seat_x != null && m.seat_y != null)
-        (S.seats[m.room_id] = S.seats[m.room_id] || {})[me.token] = { x: +m.seat_x, y: +m.seat_y };
     });
     var jobs = S.rooms.map(function(room){
       wireRoom(room.id);
