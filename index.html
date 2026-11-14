@@ -9,7 +9,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="PON">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%233f8fe0'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%233f8fe0'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3EP%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -41,12 +42,14 @@
   .brand-row{ display:flex; align-items:center; gap:8px; position:relative; z-index:1; margin-bottom:10px; }
   .brand{ font-weight:800; letter-spacing:.22em; font-size:13px; }
   .brand small{ letter-spacing:.02em; font-weight:600; opacity:.85; margin-left:6px; }
-  #btnSound, #btnInstall{
+  #btnSound, #btnInstall, #btnPush, #btnSettings{
     border:1.5px solid rgba(255,255,255,.5); background:rgba(255,255,255,.16);
     color:#fff; border-radius:11px; width:38px; height:38px; font-size:17px; cursor:pointer; flex:0 0 auto;
   }
   #btnSound{ margin-left:auto; }
-  #btnSound:active, #btnInstall:active{ transform:scale(.94); }
+  #btnSound:active, #btnInstall:active, #btnPush:active, #btnSettings:active{ transform:scale(.94); }
+  #btnPush.off{ opacity:.45; filter:grayscale(.7); }
+  #btnPush.denied{ opacity:.45; filter:grayscale(1); }
   .me-row{ display:flex; align-items:center; gap:11px; position:relative; z-index:1; cursor:pointer; }
   .avatar{
     width:48px; height:48px; border-radius:50%; flex:0 0 auto;
@@ -97,7 +100,7 @@
     color:#fff; padding:calc(14px + env(safe-area-inset-top)) 16px 14px;
   }
   .ps-title{ font-size:17px; font-weight:800; flex:1; }
-  #psClose, #inClose{
+  #psClose, #inClose, #setClose{
     border:1.5px solid rgba(255,255,255,.5); background:rgba(255,255,255,.16); color:#fff;
     border-radius:11px; width:38px; height:38px; font-size:16px; cursor:pointer; flex:0 0 auto;
   }
@@ -136,7 +139,7 @@
     border:3px solid #fff; box-shadow:0 4px 14px rgba(30,80,130,.18);
     display:flex; align-items:center; justify-content:center;
   }
-  .ps-avatar svg{ width:64px; height:auto; }
+  .ps-avatar svg{ width:100%; height:100%; display:block; }
   .ps-avatar .ps-photo{
     position:absolute; left:50%; top:24px; transform:translate(-50%,-50%);
     width:30px; height:30px; border-radius:50%; object-fit:cover; box-sizing:border-box;
@@ -182,7 +185,9 @@
   .door-card .door-ico{
     font-size:40px; line-height:1; flex:0 0 auto; width:58px; height:58px; border-radius:14px;
     display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.55);
+    position:relative; overflow:hidden;
   }
+  .door-card .door-photo{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .door-card .door-main{ flex:1; min-width:0; }
   .door-card .door-name{ font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .door-card .door-who{ font-size:12.5px; color:#7a6547; margin-top:3px; }
@@ -292,22 +297,22 @@
   @keyframes doorFlash{ 0%,100%{ filter:none; } 50%{ filter:brightness(1.5); } }
   .plant-prop{ position:absolute; left:128px; bottom:92px; font-size:28px; line-height:1; z-index:1; }
   .corkboard{
-    position:absolute; left:50%; top:12px; transform:translateX(-50%); z-index:2;
-    width:158px; height:98px; border-radius:8px; cursor:pointer;
-    background:linear-gradient(#c98f56,#bd8148); border:5px solid #8a5a33;
-    box-shadow:0 3px 8px rgba(90,50,20,.28); padding:6px; overflow:hidden;
+    position:absolute; left:50%; top:10px; transform:translateX(-50%); z-index:2;
+    width:150px; height:52px; border-radius:8px; cursor:pointer;
+    background:linear-gradient(#c98f56,#bd8148); border:4px solid #8a5a33;
+    box-shadow:0 3px 8px rgba(90,50,20,.28); padding:3px 5px; overflow:hidden;
   }
-  .corkboard .cb-title{ font-size:9.5px; font-weight:800; letter-spacing:.06em; color:#5f3c1c; text-transform:uppercase; text-align:center; }
-  .corkboard .cb-notes{ display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; justify-content:center; }
+  .corkboard .cb-title{ font-size:8.5px; font-weight:800; letter-spacing:.06em; color:#5f3c1c; text-transform:uppercase; text-align:center; }
+  .corkboard .cb-notes{ display:flex; flex-wrap:wrap; gap:3px; margin-top:2px; justify-content:center; }
+  .corkboard .cb-open{ font-size:8px; font-weight:700; color:#5f3c1c; text-align:center; margin-top:1px; opacity:.85; }
   .cb-sticky{
-    background:#fff6a8; color:#5f5410; font-size:8.5px; line-height:1.15; padding:3px 4px;
-    width:44px; height:30px; overflow:hidden; border-radius:2px; box-shadow:0 1px 3px rgba(0,0,0,.25);
+    background:#fff6a8; color:#5f5410; font-size:7.5px; line-height:1.1; padding:2px 3px;
+    width:40px; height:19px; overflow:hidden; border-radius:2px; box-shadow:0 1px 3px rgba(0,0,0,.25);
     transform:rotate(-2deg);
   }
   .cb-sticky:nth-child(2n){ transform:rotate(2deg); background:#ffd9ec; color:#6e2447; }
   .cb-sticky:nth-child(3n){ background:#cfeecb; color:#265c1f; }
-  .corkboard .cb-empty{ font-size:9.5px; color:#5f3c1c; text-align:center; margin-top:10px; font-style:italic; }
-  .cb-sticky.cb-fix{ background:#fff; color:#20507c; font-weight:700; text-align:center; transform:rotate(0); cursor:pointer; }
+  .corkboard .cb-empty{ font-size:9px; color:#5f3c1c; text-align:center; margin-top:5px; font-style:italic; }
   .rug{
     position:absolute; left:50%; bottom:52px; transform:translateX(-50%); z-index:1;
     width:190px; height:46px; border-radius:50%;
@@ -361,12 +366,11 @@
   .whisper-bal .cd{ display:block; font-size:9px; font-weight:700; color:#7d97ac; margin-top:1px; }
   .seatwrap{ position:relative; width:80px; height:86px; line-height:0; }
   .seatwrap .chair-svg{ position:absolute; left:50%; bottom:0; transform:translateX(-50%); }
-  .seatwrap .fig{ position:absolute; left:50%; bottom:30px; transform:translateX(-50%); line-height:0; }
   .seatwrap .prop{ position:absolute; font-size:16px; z-index:3; line-height:1; }
   .prop.phone{ right:2px; bottom:44px; }
   .prop.laptop{ left:50%; bottom:26px; transform:translateX(-50%); font-size:17px; z-index:5; }
   .prop.fone{ left:50%; top:-16px; transform:translateX(-50%); font-size:18px; }
-  .prop.zzz{ right:0; top:-18px; font-size:14px; animation:zzzFloat 2.2s ease-in-out infinite; }
+  .prop.zzz{ right:-4px; top:0; font-size:14px; animation:zzzFloat 2.2s ease-in-out infinite; }
   @keyframes zzzFloat{ 0%,100%{ transform:translateY(0); opacity:.85; } 50%{ transform:translateY(-4px); opacity:1; } }
   .prop.nota{ left:0; top:-14px; font-size:13px; animation:zzzFloat 1.8s ease-in-out infinite; }
   .seatwrap .jacket{ position:absolute; left:50%; bottom:22px; transform:translateX(-50%); font-size:30px; z-index:4; line-height:1; }
@@ -567,29 +571,35 @@
   .photo-count{ font-size:12px; color:var(--mut); margin-top:6px; }
   .polaroid{ cursor:pointer; }
 
-  /* foto de perfil = a CABEÇA redonda do bonequinho.
-     Geometria da cabeça no figSVG (viewBox 40x50, render 42x51):
-     centro (20,12), raio 9.5 → cabeça de ~20px centrada a 12px do
-     topo da figura. A foto cobre SÓ a cabeça: corpo e poltrona
-     continuam visíveis. Sem foto (ou com erro de carga, via onerror)
-     o chibi aparece normal por baixo. */
-  .fig .fig-photo{
-    position:absolute; left:50%; top:12px; transform:translate(-50%,-50%);
-    width:20px; height:20px; border-radius:50%; object-fit:cover; box-sizing:border-box;
-    border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:2;
+  /* avatar = SÓ A CABEÇA, flutuando sobre a poltrona (sem corpo).
+     Com foto de perfil, a foto É a cabeça (o círculo inteiro); sem
+     foto (ou com erro de carga, via onerror) aparece a cabeça chibi
+     desenhada no mesmo tamanho. Em volta, o ANEL DE STATUS: borda
+     grossa + brilho suave na cor do estado — online verde, ausente
+     amarelo, ocupado vermelho, invisível/fora cinza (as mesmas
+     cores dos .dot que o app já usa). Vale pra poltrona (com
+     brilho), Meu Canto, cartão da pessoa e folha de perfil. */
+  .seatwrap .headwrap{
+    position:absolute; left:50%; bottom:38px; transform:translateX(-50%);
+    width:46px; height:46px; border-radius:50%; overflow:hidden; z-index:3;
+    border:3px solid #fff; background:#dfe9f2; line-height:0;
+    box-shadow:0 6px 10px rgba(90,50,20,.28);
+    animation:headFloat 3.4s ease-in-out infinite;
   }
-  /* Meu Canto: figura 42x51 centrada no círculo de 48px → cabeça a 11px do topo */
-  .avatar .av-photo{
-    position:absolute; left:50%; top:11px; transform:translate(-50%,-50%);
-    width:20px; height:20px; border-radius:50%; object-fit:cover; box-sizing:border-box;
-    border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:2;
+  @keyframes headFloat{ 0%,100%{ margin-bottom:0; } 50%{ margin-bottom:3px; } }
+  .headwrap .head-photo, .avatar .av-photo, .s-avatar .av-photo, .ps-avatar .ps-photo{
+    position:absolute; inset:0; width:100%; height:100%;
+    border-radius:50%; object-fit:cover; z-index:2;
   }
-  /* cartão da pessoa: figura centrada no círculo de 62px → cabeça a 18px do topo */
-  .s-avatar .av-photo{
-    position:absolute; left:50%; top:18px; transform:translate(-50%,-50%);
-    width:20px; height:20px; border-radius:50%; object-fit:cover; box-sizing:border-box;
-    border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:2;
-  }
+  .headring{ border:3px solid #fff; }
+  .ring-online{ border-color:var(--green); }
+  .ring-away{ border-color:var(--orange); }
+  .ring-busy{ border-color:var(--red); }
+  .ring-invisible, .ring-offline{ border-color:var(--grey); }
+  .headwrap.ring-online{ border-color:var(--green); box-shadow:0 0 0 3px rgba(67,199,46,.30), 0 0 14px rgba(67,199,46,.55), 0 6px 10px rgba(90,50,20,.28); }
+  .headwrap.ring-away{ border-color:var(--orange); box-shadow:0 0 0 3px rgba(243,156,35,.30), 0 0 14px rgba(243,156,35,.55), 0 6px 10px rgba(90,50,20,.28); }
+  .headwrap.ring-busy{ border-color:var(--red); box-shadow:0 0 0 3px rgba(229,72,77,.28), 0 0 14px rgba(229,72,77,.50), 0 6px 10px rgba(90,50,20,.28); }
+  .headwrap.ring-invisible, .headwrap.ring-offline{ border-color:var(--grey); box-shadow:0 0 0 3px rgba(167,180,192,.30), 0 6px 10px rgba(90,50,20,.28); }
 
   /* lightbox: foto postada em tela cheia */
   #lightbox{
@@ -609,6 +619,25 @@
     background:rgba(255,255,255,.15); color:#fff; border:none; width:42px; height:42px;
     border-radius:50%; font-size:18px; cursor:pointer; z-index:2;
   }
+
+  /* ---------- CONFIGURAÇÕES (folha própria, padrão da folha de perfil) ---------- */
+  .settings-sheet{ z-index:210; }
+  .set-row{
+    display:flex; align-items:center; gap:12px; background:#fff;
+    border:1.5px solid #d7e6f2; border-radius:16px; padding:14px; margin-top:12px;
+  }
+  .set-row:first-child{ margin-top:2px; }
+  .set-txt{ flex:1; min-width:0; }
+  .set-name{ font-size:15.5px; font-weight:700; }
+  .set-sub{ font-size:12.5px; color:var(--mut); margin-top:2px; line-height:1.4; }
+  .set-toggle{
+    flex:0 0 auto; border:1.5px solid #d7e6f2; border-radius:20px; padding:9px 16px;
+    font-size:13.5px; font-weight:700; cursor:pointer; background:#eef5fb; color:var(--ink);
+  }
+  .set-toggle.on{ background:linear-gradient(150deg,var(--blue1),#63aaea); color:#fff; border-color:transparent; }
+  .set-toggle:active{ transform:scale(.96); }
+  .set-go{ flex:0 0 auto; font-size:20px; color:var(--mut); font-weight:700; }
+  .set-version{ text-align:center; font-size:12px; color:#9db2c4; margin-top:22px; }
 
   /* toasts */
   #toasts{ position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:90; display:flex; flex-direction:column; gap:8px; align-items:center; width:min(92vw,440px); pointer-events:none; }
@@ -632,6 +661,8 @@
     <div class="brand">PON<small>suas salas, suas pessoas</small></div>
     <button id="btnSound" type="button" title="som ligado/desligado">🔊</button>
     <button id="btnInstall" type="button" title="instalar a PON na tela inicial">📲</button>
+    <button id="btnPush" type="button" title="notificações: avisar quando te chamarem com o app fechado">🔔</button>
+    <button id="btnSettings" type="button" title="configurações">⚙️</button>
   </div>
   <div class="me-row" id="meRow" title="toca pra editar seu perfil">
     <div class="avatar" id="meAvatar"></div>
@@ -691,8 +722,8 @@
         <div class="ghost-note" id="ghostNote">👻 você está invisível — espiando pela janela</div>
       </div>
       <div class="alone-card" id="aloneCard">
-        <div class="alone-txt">Ninguém por aqui agora.<br>Fixa um recado no mural pra quem chegar depois 📌</div>
-        <button id="btnAloneMural" type="button">Fixar recado</button>
+        <div class="alone-txt">Ninguém por aqui agora.<br>Deixa um recado no mural pra quem chegar depois 📌</div>
+        <button id="btnAloneMural" type="button">📌 Abrir o mural</button>
       </div>
       <div class="talk-bar">
         <input id="talkInput" type="text" maxlength="140" placeholder="falar na sala…" autocomplete="off">
@@ -713,6 +744,8 @@
 <div id="bigSignal"><div class="big-emoji" id="bigEmoji">❤️</div></div>
 <div id="toasts"></div>
 <input type="file" id="photoFile" accept="image/*" style="display:none">
+<input type="file" id="photoFileCam" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="roomPhotoFile" accept="image/*" style="display:none">
 <input type="file" id="avatarFile" accept="image/*" style="display:none">
 <div id="lightbox"><button class="lb-close" id="lbClose" type="button" title="fechar">✕</button><img id="lbImg" alt=""><div class="lb-meta"><div class="lb-cap" id="lbCap"></div><div class="lb-sub" id="lbSub"></div></div></div>
 
@@ -729,6 +762,33 @@
   </div>
   <div class="ps-foot">
     <button id="inContinue" type="button">continuar sem instalar →</button>
+  </div>
+</div>
+
+<!-- CONFIGURAÇÕES (folha própria: notificações, sons, atalhos, versão) -->
+<div class="profile-sheet settings-sheet" id="settingsSheet" role="dialog" aria-label="Configurações">
+  <div class="ps-head">
+    <div class="ps-title">⚙️ Configurações</div>
+    <button id="setClose" type="button" title="fechar">✕</button>
+  </div>
+  <div class="ps-body">
+    <div class="set-row">
+      <div class="set-txt"><div class="set-name">🔔 Notificações</div><div class="set-sub" id="setPushSub">avisar quando te chamarem com o app fechado</div></div>
+      <button class="set-toggle" id="setPushBtn" type="button">…</button>
+    </div>
+    <div class="set-row">
+      <div class="set-txt"><div class="set-name">🔊 Sons</div><div class="set-sub" id="setSoundSub">sons da sala e dos sinais</div></div>
+      <button class="set-toggle" id="setSoundBtn" type="button">…</button>
+    </div>
+    <div class="set-row" id="setProfileRow" role="button">
+      <div class="set-txt"><div class="set-name">👤 Editar perfil</div><div class="set-sub">nome, @, frase e foto de perfil</div></div>
+      <span class="set-go">›</span>
+    </div>
+    <div class="set-row" id="setInstallRow" role="button">
+      <div class="set-txt"><div class="set-name">📲 Instalar a PON</div><div class="set-sub">fixar o ícone na tela inicial</div></div>
+      <span class="set-go">›</span>
+    </div>
+    <div class="set-version" id="setVersion"></div>
   </div>
 </div>
 
@@ -763,6 +823,11 @@
    expires_at = agora + 24h. */
 var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
 var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
+var PUSH_FN_URL = SB_URL + '/functions/v1/send-push';
+var APP_VERSION = '1.4.0';   /* exibida nas Configurações */
+/* chave pública VAPID de mentira, só pro adaptador fake (a de verdade
+   nasce dentro da Edge Function e nunca aparece em arquivo) */
+var FAKE_VAPID = 'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks';
 
 var SPEECH_TTL = 3 * 60 * 1000;        /* linha de fala: 3 min */
 var WHISPER_TTL = 3 * 60 * 60 * 1000;  /* sussurro: 3h (só na memória) */
@@ -834,8 +899,8 @@ function toast(emoji, html){
 var ME_KEY = 'pon-v1';
 var me = (function(){
   var d = { token: uuid(), name: '', handle: '', frase: '', estado: 'online',
-            color: PALETTE[Math.floor(Math.random()*PALETTE.length)], sound: true, avatar_v: 0,
-            seenInstall: false };
+            color: PALETTE[Math.floor(Math.random()*PALETTE.length)], sound: true, avatar_v: 0, rpv: {},
+            seenInstall: false, pushPromptSeen: false };
   try {
     var raw = localStorage.getItem(ME_KEY);
     if (raw) {
@@ -855,15 +920,22 @@ function myMeta(){
 }
 
 /* ---------------- desenhos (do protótipo) ---------------- */
-function figSVG(ini, color){
-  return '<svg width="42" height="51" viewBox="0 0 40 50" aria-hidden="true">'
-    + '<rect x="9" y="20" width="22" height="25" rx="9" fill="'+color+'"/>'
-    + '<circle cx="20" cy="12" r="9.5" fill="#ffd9b8"/>'
-    + '<path d="M10.5 12 a9.5 9.5 0 0 1 19 0 l0 -3.5 a9.5 8 0 0 0 -19 0 z" fill="#5a4030"/>'
-    + '<circle cx="16.6" cy="12.5" r="1.3" fill="#333"/><circle cx="23.4" cy="12.5" r="1.3" fill="#333"/>'
-    + '<path d="M17 16.5 q3 2 6 0" stroke="#b06a3b" stroke-width="1.4" fill="none" stroke-linecap="round"/>'
-    + '<text x="20" y="37" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" font-family="inherit">'+esc(ini)+'</text>'
+/* SÓ A CABEÇA do bonequinho (pedido do Fabricio: sem corpo).
+   O fundo é a cor da pessoa; a foto de perfil, quando existe,
+   cobre o círculo inteiro por cima desta cabeça desenhada. */
+function headSVG(ini, color){
+  return '<svg width="100%" height="100%" viewBox="0 0 40 40" preserveAspectRatio="xMidYMid slice" aria-hidden="true">'
+    + '<rect width="40" height="40" fill="' + color + '"/>'
+    + '<circle cx="20" cy="21" r="16.5" fill="#ffd9b8"/>'
+    + '<path d="M3.5 21 a16.5 16.5 0 0 1 33 0 l0 -5.5 a16.5 13.5 0 0 0 -33 0 z" fill="#5a4030"/>'
+    + '<circle cx="14.2" cy="22" r="2.1" fill="#333"/><circle cx="25.8" cy="22" r="2.1" fill="#333"/>'
+    + '<path d="M15 28.5 q5 3.4 10 0" stroke="#b06a3b" stroke-width="2" fill="none" stroke-linecap="round"/>'
     + '</svg>';
+}
+/* classe do ANEL DE STATUS: mesma cor do .dot de cada estado */
+function ringCls(estado){
+  var m = PRES_META[estado] || PRES_META.offline;
+  return 'ring-' + m.dot;
 }
 function chairSVG(cushion){
   return '<svg class="chair-svg" width="76" height="66" viewBox="0 0 76 66" aria-hidden="true">'
@@ -1076,11 +1148,26 @@ var SoundFX = (function(){
 
 /* ================= ADAPTADOR FAKE (testes) ================= */
 function createFakeAdapter(){
-  var store = { rooms: [], members: [], pins: [], photos: [], uploads: [], sent: [] };
-  var seq = 1;
-  var handlers = {};   /* roomId -> {presence, event} */
-  var presenceMap = {}; /* roomId -> [metas] */
-  function rid(){ return 'fake-' + (seq++); }
+  /* Barramento compartilhado: se window.PON_FAKE_BUS existe, TODOS os
+     adaptadores fake desta página enxergam o mesmo "servidor" — é o que
+     permite a prova de DOIS clientes (duas janelas, um barramento).
+     Sem barramento, comporta-se exatamente como antes (1 cliente). */
+  var bus = window.PON_FAKE_BUS || (window.PON_FAKE_BUS = {});
+  if (!bus.store) bus.store = { rooms: [], members: [], pins: [], photos: [], uploads: [], sent: [], pushSubs: [], pushCalls: [] };
+  if (!bus.presenceMap) bus.presenceMap = {};
+  if (!bus.subs) bus.subs = {};        /* roomId -> { clientId: cbs } */
+  if (!bus.clients) bus.clients = {}; /* clientId -> { token } */
+  if (!bus.seq) bus.seq = 1;
+  var store = bus.store;
+  var presenceMap = bus.presenceMap; /* roomId -> [metas] */
+  var clientId = 'cli' + Math.random().toString(36).slice(2, 9);
+  bus.clients[clientId] = { token: (typeof me !== 'undefined' && me && me.token) || clientId };
+  function rid(){ return 'fake-' + (bus.seq++); }
+  function notifyPresence(roomId){
+    var list = (presenceMap[roomId] || []).slice();
+    var m = bus.subs[roomId] || {};
+    Object.keys(m).forEach(function(k){ if (m[k] && m[k].presence) m[k].presence(list.slice()); });
+  }
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
   var api = {
     kind: 'fake', store: store,
@@ -1163,33 +1250,78 @@ function createFakeAdapter(){
       store.uploads.push({ room_id: null, path: path, avatar: true, size: blob && blob.size ? blob.size : 0 });
       return Promise.resolve({ url: SB_URL + '/storage/v1/object/public/photos/' + path, path: path });
     },
-    subscribeRoom: function(roomId, cbs){ handlers[roomId] = cbs; return Promise.resolve(true); },
-    unsubscribeRoom: function(roomId){ delete handlers[roomId]; return Promise.resolve(true); },
+    /* ---- push (fake): registra inscrições e chamadas à "função" ---- */
+    pushUpsert: function(sub){
+      var ex = store.pushSubs.filter(function(s){ return s.endpoint === sub.endpoint; })[0];
+      if (ex) Object.assign(ex, clone(sub), { updated_at: new Date().toISOString() });
+      else store.pushSubs.push(Object.assign({ id: rid(), created_at: new Date().toISOString() }, clone(sub)));
+      return Promise.resolve(true);
+    },
+    pushUnsubscribe: function(endpoint){
+      store.pushSubs = store.pushSubs.filter(function(s){ return s.endpoint !== endpoint; });
+      return Promise.resolve(true);
+    },
+    pushPublicKey: function(){ return Promise.resolve(FAKE_VAPID); },
+    pushNotify: function(payload){
+      store.pushCalls.push(clone(payload || {}));
+      return Promise.resolve({ sent: (payload && payload.targets) ? payload.targets.length : 0 });
+    },
+    updateRoom: function(roomId, patch){
+      var r = store.rooms.filter(function(x){ return x.id === roomId; })[0];
+      if (r) Object.assign(r, clone(patch));
+      return Promise.resolve(r ? clone(r) : null);
+    },
+    uploadRoomPhoto: function(roomId, blob){
+      var path = 'rooms/' + roomId + '.jpg';
+      store.uploads.push({ room_id: roomId, path: path, roomPhoto: true, size: blob && blob.size ? blob.size : 0 });
+      return Promise.resolve({ url: SB_URL + '/storage/v1/object/public/photos/' + path, path: path });
+    },
+    subscribeRoom: function(roomId, cbs){ (bus.subs[roomId] = bus.subs[roomId] || {})[clientId] = cbs; return Promise.resolve(true); },
+    unsubscribeRoom: function(roomId){ var m = bus.subs[roomId]; if (m) delete m[clientId]; return Promise.resolve(true); },
     track: function(roomId, meta){
       var list = presenceMap[roomId] || [];
       list = list.filter(function(m){ return m.token !== meta.token; });
       list.push(Object.assign({}, meta));
       presenceMap[roomId] = list;
-      if (handlers[roomId]) handlers[roomId].presence(list.slice());
+      notifyPresence(roomId);
       return Promise.resolve(true);
     },
     untrack: function(roomId, token){
-      var list = (presenceMap[roomId] || []).filter(function(m){ return m.token !== token; });
-      presenceMap[roomId] = list;
-      if (handlers[roomId]) handlers[roomId].presence(list.slice());
+      presenceMap[roomId] = (presenceMap[roomId] || []).filter(function(m){ return m.token !== token; });
+      notifyPresence(roomId);
       return Promise.resolve(true);
     },
     broadcast: function(roomId, event, payload){
       store.sent.push({ room_id: roomId, event: event, payload: clone(payload || {}) });
+      /* no barramento, o broadcast chega aos OUTROS clientes da sala
+         (no modo 1-cliente, ninguém recebe — como sempre foi) */
+      var m = bus.subs[roomId] || {};
+      Object.keys(m).forEach(function(k){
+        if (k !== clientId && m[k] && m[k].event) m[k].event(event, clone(payload || {}));
+      });
       return Promise.resolve(true);
     },
-    /* ganchos de teste: simulam OUTRO aparelho */
+    /* ganchos de teste: simulam OUTRO aparelho / o servidor */
     __setPresence: function(roomId, metas){
       presenceMap[roomId] = metas.slice();
-      if (handlers[roomId]) handlers[roomId].presence(metas.slice());
+      notifyPresence(roomId);
     },
     __emit: function(roomId, event, payload){
-      if (handlers[roomId]) handlers[roomId].event(event, payload || {});
+      var m = bus.subs[roomId] || {};
+      Object.keys(m).forEach(function(k){ if (m[k] && m[k].event) m[k].event(event, payload || {}); });
+    },
+    /* o servidor PERDE o track de alguém em silêncio (o rejoin de canal
+       que causou o bug em produção): os outros são avisados da saída,
+       a "vítima" não recebe nada — ela nem sabe que sumiu. */
+    __losePresence: function(roomId, token){
+      presenceMap[roomId] = (presenceMap[roomId] || []).filter(function(x){ return x.token !== token; });
+      var list = presenceMap[roomId].slice();
+      var m = bus.subs[roomId] || {};
+      Object.keys(m).forEach(function(k){
+        var dono = bus.clients[k];
+        if (dono && dono.token === token) return;
+        if (m[k] && m[k].presence) m[k].presence(list.slice());
+      });
     },
     __presence: function(roomId){ return (presenceMap[roomId] || []).slice(); }
   };
@@ -1204,7 +1336,7 @@ function createRealAdapter(){
   });
   var channels = {}; /* roomId -> {ch, cbs, tracked} */
   function chState(roomId){
-    if (!channels[roomId]) channels[roomId] = { ch: null, cbs: null, tracked: false, ready: null };
+    if (!channels[roomId]) channels[roomId] = { ch: null, cbs: null, tracked: false, ready: null, status: '', wantTrack: false, lastMeta: null };
     return channels[roomId];
   }
   function ensureChannel(roomId){
@@ -1226,7 +1358,19 @@ function createRealAdapter(){
       if (st.cbs && msg && msg.payload) st.cbs.event(msg.payload.type, msg.payload);
     });
     st.ready = new Promise(function(res){
-      ch.subscribe(function(status){ if (status === 'SUBSCRIBED') res(true); });
+      ch.subscribe(function(status){
+        st.status = status;
+        if (status === 'SUBSCRIBED'){
+          res(true);
+          /* CAUSA-RAIZ do bug "estou na sala mas não apareço": quando a
+             conexão cai (celular dorme, rede troca, aba congela) e o
+             canal REENTRA, o servidor NÃO restaura o track antigo — o
+             canal volta "pelado" e a pessoa some do presenceState()
+             embora o broadcast continue chegando. Por isso: TODA
+             (re)inscrição re-anuncia a presença guardada. */
+          if (st.wantTrack && st.lastMeta){ st.tracked = true; ch.track(st.lastMeta); }
+        }
+      });
     });
     st.ch = ch;
     return st;
@@ -1270,6 +1414,17 @@ function createRealAdapter(){
     deleteRoom: function(roomId){
       return rows(sb.from('rooms').delete().eq('id', roomId)).then(function(){ return true; });
     },
+    updateRoom: function(roomId, patch){
+      return rows(sb.from('rooms').update(patch).eq('id', roomId).select().single());
+    },
+    uploadRoomPhoto: function(roomId, blob){
+      var path = 'rooms/' + roomId + '.jpg';
+      return sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+        .then(function(r){
+          if (r.error) throw r.error;
+          return { path: path };
+        });
+    },
     listPins: function(roomId){
       return rows(sb.from('pins').select('*').eq('room_id', roomId).order('created_at', { ascending: false }))
         .then(function(d){ return d || []; });
@@ -1307,6 +1462,39 @@ function createRealAdapter(){
           return { path: path };
         });
     },
+    /* ---- push: inscrição na tabela + disparos via Edge Function ---- */
+    pushUpsert: function(sub){
+      return rows(sb.from('push_subs')
+        .upsert(Object.assign({}, sub, { updated_at: new Date().toISOString() }), { onConflict: 'endpoint' }))
+        .then(function(){ return true; });
+    },
+    pushUnsubscribe: function(endpoint){
+      return rows(sb.from('push_subs').delete().eq('endpoint', endpoint).eq('device_token', me.token))
+        .then(function(){ return true; });
+    },
+    pushPublicKey: function(){
+      return fetch(PUSH_FN_URL + '?public=1', {
+        headers: { 'Authorization': 'Bearer ' + SB_KEY, 'apikey': SB_KEY }
+      }).then(function(r){
+        if (!r.ok) throw new Error('send-push indisponível');
+        return r.json();
+      }).then(function(j){
+        if (!j || !j.publicKey) throw new Error('sem chave pública');
+        return j.publicKey;
+      });
+    },
+    pushNotify: function(payload){
+      /* fire-and-forget: quem chama trata o erro; aqui só não propagamos */
+      return fetch(PUSH_FN_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + SB_KEY, 'apikey': SB_KEY,
+          'x-device-token': me.token, 'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }).then(function(r){ return r.ok ? r.json().catch(function(){ return { sent: 0 }; }) : { sent: 0 }; })
+        .catch(function(){ return { sent: 0 }; });
+    },
     subscribeRoom: function(roomId, cbs){
       var st = ensureChannel(roomId);
       st.cbs = cbs;
@@ -1320,11 +1508,18 @@ function createRealAdapter(){
     },
     track: function(roomId, meta){
       var st = ensureChannel(roomId);
-      return st.ready.then(function(){ st.tracked = true; return st.ch.track(meta); });
+      st.wantTrack = true; st.lastMeta = meta;
+      if (st.status === 'SUBSCRIBED'){ st.tracked = true; return Promise.resolve(st.ch.track(meta)); }
+      return st.ready.then(function(){
+        if (st.wantTrack && st.lastMeta){ st.tracked = true; return st.ch.track(st.lastMeta); }
+        return true;
+      });
     },
     untrack: function(roomId){
       var st = channels[roomId];
-      if (st && st.ch && st.tracked) { st.tracked = false; return st.ch.untrack(); }
+      if (!st) return Promise.resolve(true);
+      st.wantTrack = false; st.lastMeta = null;
+      if (st.ch && st.tracked) { st.tracked = false; return st.ch.untrack(); }
       return Promise.resolve(true);
     },
     broadcast: function(roomId, type, payload){
@@ -1352,6 +1547,8 @@ var S = {
   seats: {},            /* roomId -> { token: {x,y} } */
   lastTalkAt: {},       /* roomId -> ts da última fala (qualquer um) */
   bursts: {},           /* roomId -> { token: {emoji, until} } */
+  lastHb: {},           /* roomId -> { token: {at, estado} } — heartbeat recente (broadcast 'hb') */
+  roomPhotoV: {},       /* roomId -> versão da foto da sala (de quem não é dono) */
   currentRoom: null,
   booted: false
 };
@@ -1362,18 +1559,31 @@ function memberOf(roomId, token){
   for (var i=0;i<list.length;i++) if (list[i].device_token === token) return list[i];
   return null;
 }
+/* presença "de verdade": o sync de presença pode estar velho/perdido
+   (rejoin de canal), então quem tem heartbeat recente (<60s) conta
+   como presente mesmo sem constar no mapa de presença. */
+var HB_FRESH_MS = 60000, PRES_FRESH_MS = 90000;
+function hbEntry(roomId, token){ return (S.lastHb[roomId] || {})[token] || null; }
+function hbFresh(roomId, token){
+  var hb = hbEntry(roomId, token);
+  return !!hb && (Date.now() - hb.at < HB_FRESH_MS);
+}
+function presFresh(p){ return !!p && (!p.ts || (Date.now() - p.ts < PRES_FRESH_MS)); }
 function personDisplay(roomId, token){
   if (token === me.token) return myMeta();
   var pres = (S.presence[roomId] || {})[token];
   var mem = memberOf(roomId, token);
   var base = mem || {};
   var p = pres || {};
+  var estado = presFresh(pres) ? (p.estado || 'online')
+             : hbFresh(roomId, token) ? (hbEntry(roomId, token).estado || 'online')
+             : 'offline';
   return {
     token: token,
     name: p.name || base.name || 'Alguém',
     handle: p.handle || base.handle || '',
     frase: p.frase != null ? p.frase : (base.frase || ''),
-    estado: pres ? (p.estado || 'online') : 'offline',
+    estado: estado,
     color: p.color || base.color || '#888',
     avatar_v: token === me.token ? (me.avatar_v || 0) : (p.avatar_v || 0),
     ini: iniOf(p.name || base.name || '?')
@@ -1384,9 +1594,9 @@ function presentTokens(roomId){
   return Object.keys(pres).filter(function(t){ return pres[t] && pres[t].estado !== 'invisible' || t === me.token; });
 }
 function isPresent(roomId, token){
-  if (token === me.token) return S.currentRoom === roomId && me.estado !== 'invisible' ? true : (S.currentRoom === roomId);
-  var p = (S.presence[roomId] || {})[token];
-  return !!p;
+  if (token === me.token) return S.currentRoom === roomId;
+  if (hbFresh(roomId, token)) return true;
+  return presFresh((S.presence[roomId] || {})[token]);
 }
 function seatPos(roomId, token, idx){
   var sm = S.seats[roomId] || {};
@@ -1396,6 +1606,22 @@ function seatPos(roomId, token, idx){
 }
 function inviteLink(room){
   return location.origin + location.pathname + '#c/' + room.invite_code;
+}
+/* foto do cartão da sala: arquivo fixo rooms/<id>.jpg no bucket
+   (sobrescreve). Sem coluna nova: a versão (timestamp do upload)
+   fica no localStorage do dono, viaja no Presence dele (rpv) e no
+   broadcast 'roommeta'. Sem versão conhecida, tenta a URL pura —
+   se o arquivo não existir, o onerror some com a img e o emoji fica. */
+function roomPhotoV(room){
+  if (!room) return 0;
+  if (room.owner_token === me.token) return ((me.rpv || {})[room.id] || S.roomPhotoV[room.id] || 0);
+  var pres = (S.presence[room.id] || {})[room.owner_token];
+  return S.roomPhotoV[room.id] || (pres && pres.rpv) || 0;
+}
+function roomPhotoImg(room){
+  var v = roomPhotoV(room);
+  var url = SB_URL + '/storage/v1/object/public/photos/rooms/' + room.id + '.jpg' + (v ? '?v=' + v : '');
+  return '<img class="door-photo" src="' + esc(url) + '" alt="" onerror="this.remove()">';
 }
 
 /* ================= TEMPO REAL ================= */
@@ -1420,8 +1646,11 @@ function onPresence(roomId, metas){
     }
   });
   Object.keys(before).forEach(function(t){
-    if (!nowMap[t] && t !== me.token && S.currentRoom === roomId) SoundFX.play('exit');
+    if (!nowMap[t] && t !== me.token && S.currentRoom === roomId && !hbFresh(roomId, t)) SoundFX.play('exit');
   });
+  /* auto-cura: eu estou NESTA sala, não estou invisível, e o sync não
+     me lista → meu track se perdeu (rejoin): re-anuncia na hora. */
+  if (S.currentRoom === roomId && me.estado !== 'invisible' && !nowMap[me.token]) trackMe(roomId);
   if (S.currentRoom === roomId) renderRoom();
   renderHall();
 }
@@ -1449,6 +1678,20 @@ function onEvent(roomId, type, p){
       shakeChar(me.token);
       toast('👋', '<b>' + esc(p.name || 'Alguém') + '</b> chamou sua atenção');
     }
+  } else if (type === 'hb'){
+    /* heartbeat de presença (a cada ~20s de quem está na sala):
+       carimba a última vez que a pessoa foi vista DE VERDADE */
+    var wasP = isPresent(roomId, p.from);
+    var prevEst = personDisplay(roomId, p.from).estado;
+    (S.lastHb[roomId] = S.lastHb[roomId] || {})[p.from] = { at: Date.now(), estado: p.estado || 'online' };
+    if (S.currentRoom === roomId && (wasP !== isPresent(roomId, p.from) || prevEst !== (p.estado || 'online'))) renderRoom();
+  } else if (type === 'roommeta'){
+    /* nome/foto da sala mudaram: reflete pra todo mundo */
+    var rmx = roomById(roomId);
+    if (rmx && p.name) rmx.name = p.name;
+    if (p.photo_v) S.roomPhotoV[roomId] = p.photo_v;
+    if (rmx && S.currentRoom === roomId) el('roomName').textContent = (rmx.emoji || '🚪') + ' ' + rmx.name;
+    renderHall();
   } else if (type === 'seat'){
     (S.seats[roomId] = S.seats[roomId] || {})[p.from] = { x: p.x, y: p.y };
   } else if (type === 'meta'){
@@ -1472,20 +1715,25 @@ function onEvent(roomId, type, p){
   } else if (type === 'joined'){
     refreshMembers(roomId);
   }
-  if (S.currentRoom === roomId && type !== 'meta') renderRoom();
+  if (S.currentRoom === roomId && type !== 'meta' && type !== 'hb' && type !== 'roommeta') renderRoom();
   if (type === 'say' || type === 'joined') renderHall();
 }
 function removeRoomLocal(roomId){
   DB.unsubscribeRoom(roomId);
   S.rooms = S.rooms.filter(function(r){ return r.id !== roomId; });
   delete S.myMembers[roomId]; delete S.members[roomId]; delete S.presence[roomId];
+  delete S.lastHb[roomId]; delete S.roomPhotoV[roomId];
   delete S.pins[roomId]; delete S.photos[roomId]; delete S.speech[roomId];
   if (S.currentRoom === roomId){ S.currentRoom = null; showHall(); }
   renderHall();
 }
 function refreshMembers(roomId){
   return DB.listMembers(roomId).then(function(list){
-    S.members[roomId] = list;
+    var seenTok = {};
+    S.members[roomId] = list.filter(function(m){
+      if (!m || !m.device_token || seenTok[m.device_token]) return false;
+      seenTok[m.device_token] = 1; return true;
+    });
     list.forEach(function(m){
       if (m.seat_x != null && m.seat_y != null)
         (S.seats[roomId] = S.seats[roomId] || {})[m.device_token] = { x: +m.seat_x, y: +m.seat_y };
@@ -1514,10 +1762,34 @@ function refreshPhotos(roomId){
     });
   }).catch(function(){});
 }
+function myMetaFor(roomId){
+  var m = myMeta();
+  m.ts = Date.now();   /* carimbo: presença sem ts novo + sem heartbeat = caiu */
+  m.rpv = (me.rpv || {})[roomId] || 0;   /* versão da foto da sala (se sou o dono) */
+  return m;
+}
 function trackMe(roomId){
   if (me.estado === 'invisible') return DB.untrack(roomId, me.token);
-  return DB.track(roomId, myMeta());
+  return DB.track(roomId, myMetaFor(roomId));
 }
+/* ---- heartbeat de presença (~20s) + retorno pra aba/app ----
+   Quem está na sala re-anuncia a presença (track com ts novo) e manda
+   um 'hb' leve por broadcast — o broadcast é justamente o canal que
+   continua funcionando quando a presença quebra. */
+var HB_MS = 20000;
+function heartbeatNow(){
+  var roomId = S.currentRoom; if (!roomId) return;
+  if (me.estado === 'invisible') return;
+  trackMe(roomId);
+  (S.lastHb[roomId] = S.lastHb[roomId] || {})[me.token] = { at: Date.now(), estado: me.estado };
+  DB.broadcast(roomId, 'hb', { from: me.token, ts: Date.now(), estado: me.estado });
+}
+setInterval(heartbeatNow, HB_MS);
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'visible') heartbeatNow();
+});
+window.addEventListener('focus', heartbeatNow);
+window.addEventListener('pageshow', heartbeatNow);
 
 /* ================= FALA (efêmera) ================= */
 function pushSpeech(roomId, token, text, mine){
@@ -1570,7 +1842,8 @@ function pruneEphemeral(){
 
 /* ================= RENDER: MEU CANTO ================= */
 function renderCanto(){
-  el('meAvatar').innerHTML = figSVG(me.ini || iniOf(me.name || 'V'), me.color) + avatarImgHtml(me.token, me.avatar_v, 'av-photo');
+  el('meAvatar').innerHTML = headSVG(me.ini || iniOf(me.name || 'V'), me.color) + avatarImgHtml(me.token, me.avatar_v, 'av-photo');
+  el('meAvatar').setAttribute('class', 'avatar headring ' + ringCls(me.estado));
   el('meAvatar').style.background = me.color;
   el('meNameTxt').textContent = me.name || 'Você';
   el('meHandleTxt').textContent = myHandle();
@@ -1580,12 +1853,14 @@ function renderCanto(){
   var btns = el('presBar').querySelectorAll('.pbtn');
   for (var i=0;i<btns.length;i++) btns[i].classList.toggle('sel', btns[i].getAttribute('data-pres') === me.estado);
   el('btnSound').textContent = me.sound ? '🔊' : '🔇';
+  updatePushBtn();
 }
 
 /* ================= RENDER: ENTRADA ================= */
 function doorStatus(roomId){
-  var pres = S.presence[roomId] || {};
-  var inside = Object.keys(pres).length;
+  var members = S.members[roomId] || [];
+  var inside = members.filter(function(m){ return m.device_token !== me.token && isPresent(roomId, m.device_token); }).length;
+  if (S.currentRoom === roomId && me.estado !== 'invisible') inside += 1;
   var speakers = liveSpeakers(roomId).length;
   if (speakers && inside) return { talking: true, text: '💬 conversa agora' };
   if (S.lastTalkAt[roomId]) return { talking: false, text: 'última fala ' + relText(S.lastTalkAt[roomId]) };
@@ -1609,7 +1884,7 @@ function renderHall(){
     }).join('');
     var names = members.map(function(m){ return esc(personDisplay(room.id, m.device_token).name); }).join(', ');
     h += '<div class="door-card' + (st.talking ? ' talking' : '') + '" data-room="' + room.id + '">'
-      + '<div class="door-ico" style="border:2px solid ' + esc(room.color || '#d9b98c') + '">' + esc(room.emoji || '🚪') + '</div>'
+      + '<div class="door-ico" style="border:2px solid ' + esc(room.color || '#d9b98c') + '"><span class="door-emoji">' + esc(room.emoji || '🚪') + '</span>' + roomPhotoImg(room) + '</div>'
       + '<div class="door-main"><div class="door-name">' + esc(room.name) + '</div>'
       + '<div class="door-who">' + (names || 'só você, por enquanto') + '</div>'
       + '<div class="door-faces">' + faces + '</div>'
@@ -1649,6 +1924,7 @@ function enterRoom(roomId){
   renderRoom();
   updateSky();
   setTimeout(function(){ focusOn(me.token); }, 60);
+  setTimeout(function(){ maybePushPrompt(roomId); }, 1400);
 }
 function leaveToHall(){
   if (S.currentRoom) DB.untrack(S.currentRoom, me.token);
@@ -1668,15 +1944,17 @@ function flashDoor(){
   d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash');
 }
 function renderCorkboard(){
+  /* o quadro dentro da sala é só uma PORTINHA/teaser: mostra 2–3
+     mini-recados decorativos e abre a PÁGINA do mural no toque —
+     é lá que se lê tudo e se escreve (o compositor mora lá). */
   var roomId = S.currentRoom; if (!roomId) return;
   var act = S.pins[roomId] || [];
-  var h = '<div class="cb-title">📌 mural · 24h</div>';
-  if (!act.length) h += '<div class="cb-empty">vazio — fixa um recado pra quem não está</div>';
+  var h = '<div class="cb-title">📌 mural</div>';
+  if (!act.length) h += '<div class="cb-empty">toca pra escrever</div>';
   h += '<div class="cb-notes">';
-  act.slice(0, 2).forEach(function(p){ h += '<span class="cb-sticky">' + esc(p.texto) + '</span>'; });
-  h += '<span class="cb-sticky cb-fix" id="cbFix">✏️ fixar recado</span></div>';
+  act.slice(0, 3).forEach(function(p){ h += '<span class="cb-sticky">' + esc(p.texto) + '</span>'; });
+  h += '</div><div class="cb-open">toca pra abrir ›</div>';
   el('corkboard').innerHTML = h;
-  el('cbFix').addEventListener('click', function(ev){ ev.stopPropagation(); openMuralSheet(); });
 }
 function balloonDims(lines){
   var maxLen = 0;
@@ -1728,7 +2006,8 @@ function charHtml(roomId, token, idx){
     inner = '<div class="bal-col">' + bal + '</div>'
       + chip
       + '<div class="seatwrap">' + chairSVG(d.color)
-      + '<div class="fig">' + figSVG(d.ini, d.color) + avatarImgHtml(token, d.avatar_v, 'fig-photo') + propFor(d.estado) + '</div></div>'
+      + '<div class="headwrap ' + ringCls(d.estado) + '">' + headSVG(d.ini, d.color) + avatarImgHtml(token, d.avatar_v, 'head-photo') + '</div>'
+      + propFor(d.estado) + '</div>'
       + (burst && burst.until > Date.now() ? '<div class="sig-burst">' + esc(burst.emoji) + '</div>' : '')
       + '<div class="under-name"><span class="dot ' + esc((PRES_META[d.estado] || PRES_META.online).dot) + '"></span>' + esc(d.name) + '</div>';
   }
@@ -1885,7 +2164,7 @@ function openPersonSheet(roomId, token){
   var myPinsOut = (wSlot && wSlot.fromMe) ? wSlot : null;
   var photos = (S.photos[roomId] || []).filter(function(p){ return p.author_token === token; });
   var h = '<div class="sheet-top">'
-    + '<div class="s-avatar" style="background:' + esc(d.color) + '">' + figSVG(d.ini, d.color)
+    + '<div class="s-avatar headring ' + ringCls(d.estado) + '" style="background:' + esc(d.color) + '">' + headSVG(d.ini, d.color)
     + avatarImgHtml(token, d.avatar_v, 'av-photo')
     + '<span class="dot ' + esc(pm.dot) + '"></span></div>'
     + '<div><div class="sheet-name">' + esc(d.name) + (mine ? ' (você)' : '') + '</div>'
@@ -1930,7 +2209,8 @@ function openPersonSheet(roomId, token){
   }
   if (mine){
     h += '<input class="txt-input" id="pCaption" type="text" maxlength="40" placeholder="legenda da foto (opcional)" style="margin-top:10px">'
-      + '<button class="abtn wide" id="pPhotoBtn" type="button">📸 postar foto nesta sala</button>'
+      + '<div class="sheet-actions" style="margin-top:10px"><button class="abtn nudge" id="pCamBtn" type="button">📷 Câmera</button>'
+      + '<button class="abtn wave" id="pGalBtn" type="button">🖼️ Galeria</button></div>'
       + '<div class="photo-count">da câmera ou da galeria · 1 foto por hora · vale só pra esta sala · some em 24h</div>'
       + '<div class="sec-title">Sua conta nesta sala</div>'
       + '<button class="abtn wave" id="pLeave" type="button" style="width:100%">🚪 sair desta sala</button>';
@@ -1951,7 +2231,11 @@ function openPersonSheet(roomId, token){
     if (rm) rm.addEventListener('click', function(){ removeMember(roomId, token); });
   } else {
     el('pAvatarBtn').addEventListener('click', function(){ el('avatarFile').click(); });
-    el('pPhotoBtn').addEventListener('click', function(){
+    el('pCamBtn').addEventListener('click', function(){
+      pendingCaption = el('pCaption').value.trim();
+      el('photoFileCam').click();
+    });
+    el('pGalBtn').addEventListener('click', function(){
       pendingCaption = el('pCaption').value.trim();
       el('photoFile').click();
     });
@@ -2108,15 +2392,24 @@ function openRoomMenu(){
   var h = '<div class="sheet-name">⚙️ ' + esc(room.name) + '</div>'
     + '<div class="sheet-pres">código da sala: <b>' + esc(room.invite_code) + '</b></div>'
     + '<button class="abtn wave" id="rmInvite" type="button" style="width:100%;margin-top:14px">➕ convidar (ver link e código)</button>'
+    + '<button class="abtn wave" id="rmSettings" type="button" style="width:100%;margin-top:10px">⚙️ configurações do app</button>'
     + '<button class="abtn wave" id="rmLeave" type="button" style="width:100%;margin-top:10px">🚪 sair desta sala</button>';
   if (isOwner(room))
     h += '<div class="sec-title">Dono da sala</div>'
-      + '<button class="abtn danger" id="rmDelete" type="button" style="width:100%">🗑️ apagar esta sala pra todos</button>';
+      + '<input class="txt-input" id="rmName" type="text" maxlength="30" value="' + esc(room.name) + '">'
+      + '<button class="abtn wave" id="rmRename" type="button" style="width:100%;margin-top:10px">✏️ renomear sala</button>'
+      + '<button class="abtn wave" id="rmRoomPhoto" type="button" style="width:100%;margin-top:10px">📷 foto da sala (cartão da porta)</button>'
+      + '<button class="abtn danger" id="rmDelete" type="button" style="width:100%;margin-top:10px">🗑️ apagar esta sala pra todos</button>';
   h += sheetCloseBtn();
   openSheet(h);
   bindClose();
   el('rmInvite').addEventListener('click', openInviteSheet);
+  el('rmSettings').addEventListener('click', function(){ closeSheet(); openSettings(); });
   el('rmLeave').addEventListener('click', function(){ leaveRoom(roomId); });
+  var rn = el('rmRename');
+  if (rn) rn.addEventListener('click', function(){ renameRoom(roomId, el('rmName').value); });
+  var rp = el('rmRoomPhoto');
+  if (rp) rp.addEventListener('click', function(){ pendingRoomPhoto = roomId; el('roomPhotoFile').click(); });
   var del = el('rmDelete');
   if (del) del.addEventListener('click', function(){
     if (this.getAttribute('data-arm') === '1'){
@@ -2127,6 +2420,157 @@ function openRoomMenu(){
       this.textContent = '🗑️ tem certeza? toca de novo pra apagar';
     }
   });
+}
+
+/* ================= NOTIFICAÇÕES PUSH =================
+   App fechado também chama: cutucada/sinal/fala de alguém viram push
+   no aparelho de quem NÃO está na sala agora. Quem está presente vê
+   ao vivo (e o service worker suprime a notificação com o app aberto).
+   A inscrição mora em push_subs; o envio é da Edge Function send-push;
+   a chave privada VAPID nunca sai do Supabase. */
+function pushSupported(){
+  try { return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
+  catch(e){ return false; }
+}
+function urlB64ToUint8Array(b64){
+  var pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  var base = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  var raw = atob(base);
+  var arr = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+var pushReg = null;
+function registerSW(){
+  if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+  return navigator.serviceWorker.register('sw.js')
+    .then(function(reg){ pushReg = reg; return reg; })
+    .catch(function(){ return null; });
+}
+function pushReadyReg(){
+  if (pushReg) return Promise.resolve(pushReg);
+  if (navigator.serviceWorker && navigator.serviceWorker.ready)
+    return navigator.serviceWorker.ready.then(function(reg){ pushReg = reg; return reg; }).catch(function(){ return null; });
+  return registerSW();
+}
+function pushSubscription(){
+  return pushReadyReg().then(function(reg){
+    if (!reg || !reg.pushManager) return null;
+    return reg.pushManager.getSubscription().catch(function(){ return null; });
+  }).catch(function(){ return null; });
+}
+function updatePushBtn(){
+  var btn = el('btnPush'); if (!btn) return;
+  if (!pushSupported()){ btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  if (window.Notification && Notification.permission === 'denied'){
+    btn.textContent = '🔕'; btn.classList.add('denied'); btn.classList.remove('off'); return;
+  }
+  btn.classList.remove('denied');
+  pushSubscription().then(function(sub){
+    btn.textContent = sub ? '🔔' : '🔕';
+    btn.classList.toggle('off', !sub);
+  });
+}
+function enablePush(){
+  /* no iPhone, push na web só existe com o app instalado na tela
+     inicial: fora do standalone, o caminho é a página de instalação */
+  if (platformKind() === 'ios' && !isStandalone()){
+    openInstall(null);
+    toast('📲', 'no iPhone, primeiro fixa a PON na tela inicial — depois o 🔔 liga por aqui');
+    return Promise.resolve(false);
+  }
+  if (!pushSupported()){
+    toast('🔔', 'este navegador não aceita notificações da PON');
+    return Promise.resolve(false);
+  }
+  return Notification.requestPermission().then(function(perm){
+    if (perm !== 'granted'){
+      toast('🔕', 'permissão negada — sem ela, o aviso com app fechado não chega');
+      updatePushBtn();
+      return false;
+    }
+    return registerSW().then(function(reg){
+      if (!reg) throw new Error('sem service worker');
+      return DB.pushPublicKey().then(function(key){
+        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(key) });
+      });
+    }).then(function(sub){
+      var j = (sub && sub.toJSON) ? sub.toJSON() : null;
+      if (!j || !j.endpoint || !j.keys) throw new Error('inscrição incompleta');
+      return DB.pushUpsert({ device_token: me.token, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth })
+        .then(function(){
+          toast('🔔', 'notificações ligadas neste aparelho — app fechado, a PON te chama');
+          updatePushBtn();
+          return true;
+        });
+    });
+  }).catch(function(){
+    toast('⚠️', 'não consegui ligar as notificações agora — tenta de novo');
+    updatePushBtn();
+    return false;
+  });
+}
+function disablePush(){
+  return pushSubscription().then(function(sub){
+    if (!sub) { updatePushBtn(); return false; }
+    var endpoint = sub.endpoint;
+    return DB.pushUnsubscribe(endpoint).catch(function(){}).then(function(){
+      return sub.unsubscribe ? sub.unsubscribe().catch(function(){ return false; }) : false;
+    }).then(function(){
+      toast('🔕', 'notificações desligadas neste aparelho');
+      updatePushBtn();
+      return true;
+    });
+  }).catch(function(){ updatePushBtn(); return false; });
+}
+function openPushSheet(){
+  openSheet('<div class="sheet-top"><div><div class="sheet-name">🔔 Te avisar fora da sala?</div>'
+    + '<div class="sheet-handle">com o app fechado, cutucada, sinal e fala de quem você gosta chegam como notificação</div></div></div>'
+    + '<div class="sheet-actions"><button class="abtn nudge" id="pushGo" type="button">🔔 ativar notificações</button></div>'
+    + sheetCloseBtn());
+  bindClose();
+  el('pushGo').addEventListener('click', function(){ closeSheet(); enablePush(); });
+}
+/* convite contextual: 1ª entrada numa sala com mais alguém, uma vez */
+function maybePushPrompt(roomId){
+  if (me.pushPromptSeen || !pushSupported()) return;
+  if (Notification.permission === 'denied') { me.pushPromptSeen = true; saveMe(); return; }
+  var others = (S.members[roomId] || []).some(function(m){ return m.device_token !== me.token; });
+  if (!others) return;
+  pushSubscription().then(function(sub){
+    if (sub){ me.pushPromptSeen = true; saveMe(); return; }
+    if (Notification.permission === 'granted'){ enablePush(); return; }
+    if (el('sheetWrap').classList.contains('open') || el('profileSheet').classList.contains('open')) return; /* tenta na próxima */
+    me.pushPromptSeen = true; saveMe();
+    openPushSheet();
+  }).catch(function(){});
+}
+/* dispara o push SÓ pra quem é da sala e NÃO está presente agora.
+   kind: 'say' | 'signal' | 'nudge'. onlyToken restringe (sinal/cutucada
+   são pra uma pessoa só). Nunca quebra o envio normal: catch em tudo. */
+function notifyAbsent(roomId, kind, extra, onlyToken){
+  try {
+    var members = S.members[roomId] || [];
+    var targets = [];
+    members.forEach(function(m){
+      var t = m.device_token;
+      if (!t || t === me.token) return;
+      if (onlyToken && t !== onlyToken) return;
+      if (isPresent(roomId, t)) return;   /* está na sala (até invisível): vê ao vivo */
+      targets.push(t);
+    });
+    if (!targets.length) return;
+    var room = roomById(roomId);
+    var payload = {
+      room_id: roomId, room_name: room ? room.name : 'sala',
+      from_token: me.token, from_name: me.name || 'Você',
+      kind: kind, targets: targets
+    };
+    if (extra) for (var k in extra) payload[k] = extra[k];
+    var p = DB.pushNotify(payload);
+    if (p && p.catch) p.catch(function(){});
+  } catch(e){}
 }
 
 /* ================= AÇÕES ================= */
@@ -2153,6 +2597,7 @@ function say(text){
   pushSpeech(roomId, me.token, text, true);
   S.lastTalkAt[roomId] = Date.now();
   DB.broadcast(roomId, 'say', { from: me.token, name: me.name, text: text });
+  notifyAbsent(roomId, 'say', { text: text.slice(0, 60) });
   SoundFX.play('popme');
   el('talkInput').value = '';
   renderRoom();
@@ -2171,6 +2616,7 @@ function sendWhisper(roomId, token, text){
 function sendSignal(roomId, token, emoji){
   (S.bursts[roomId] = S.bursts[roomId] || {})[token] = { emoji: emoji, until: Date.now() + 1500 };
   DB.broadcast(roomId, 'signal', { from: me.token, to: token, emoji: emoji });
+  notifyAbsent(roomId, 'signal', { emoji: emoji }, token);
   SoundFX.signal(emoji);   /* quem envia também ouve o som do sinal */
   closeSheet();
   renderRoom();
@@ -2179,6 +2625,7 @@ function sendSignal(roomId, token, emoji){
 }
 function sendNudge(roomId, token){
   DB.broadcast(roomId, 'nudge', { from: me.token, to: token, name: me.name });
+  notifyAbsent(roomId, 'nudge', {}, token);
   shakeChar(token);
   closeSheet();
   focusOn(token);
@@ -2199,6 +2646,41 @@ function pinMural(roomId, text, toName, durH){
     return refreshPins(roomId);
   }).then(function(){ openMuralSheet(); toast('📌', 'recado fixado — some em 24h'); })
     .catch(function(){ toast('⚠️', 'não consegui fixar agora — tenta de novo'); });
+}
+/* renomear a sala: muda o name compartilhado (RLS: só o dono) e
+   avisa todo mundo pelo broadcast 'roommeta'. */
+function renameRoom(roomId, name){
+  name = String(name || '').trim();
+  if (!name){ toast('✏️', 'o nome da sala não pode ficar vazio'); return Promise.resolve(false); }
+  var room = roomById(roomId); if (!room) return Promise.resolve(false);
+  return DB.updateRoom(roomId, { name: name }).then(function(){
+    room.name = name;
+    DB.broadcast(roomId, 'roommeta', { from: me.token, name: name });
+    if (S.currentRoom === roomId) el('roomName').textContent = (room.emoji || '🚪') + ' ' + room.name;
+    renderHall();
+    closeSheet();
+    toast('✏️', 'sala renomeada pra todo mundo');
+    return true;
+  }).catch(function(){ toast('⚠️', 'não consegui renomear — só o dono muda o nome'); return false; });
+}
+/* foto do cartão da sala: sobe pra rooms/<id>.jpg e versiona */
+var pendingRoomPhoto = null;
+function setRoomPhotoFromDataUrl(roomId, dataUrl){
+  return new Promise(function(resolve){
+    downscaleImage(dataUrl, function(small){
+      var blob = dataUrlToBlob(small);
+      DB.uploadRoomPhoto(roomId, blob).then(function(){
+        var v = Date.now();
+        me.rpv = me.rpv || {}; me.rpv[roomId] = v; saveMe();
+        S.roomPhotoV[roomId] = v;
+        DB.broadcast(roomId, 'roommeta', { from: me.token, photo_v: v });
+        if (S.currentRoom === roomId) trackMe(roomId);
+        renderHall();
+        toast('📷', 'foto da sala atualizada no cartão da porta');
+        resolve(true);
+      }).catch(function(){ toast('⚠️', 'a foto da sala não subiu — tenta de novo'); resolve(false); });
+    });
+  });
 }
 function removeMember(roomId, token){
   DB.deleteMember(roomId, token).then(function(){
@@ -2329,14 +2811,20 @@ function downscaleImage(dataUrl, cb){
     img.src = dataUrl;
   } catch(e){ fin(dataUrl); }
 }
-el('photoFile').addEventListener('change', function(){
-  var f = this.files && this.files[0];
-  this.value = '';
-  if (!f) return;
-  var rd = new FileReader();
-  rd.onload = function(){ postPhotoData(String(rd.result), pendingCaption); };
-  rd.readAsDataURL(f);
-});
+function wireFileInput(input, onDataUrl){
+  if (!input) return;
+  input.addEventListener('change', function(){
+    var f = this.files && this.files[0];
+    this.value = '';
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){ onDataUrl(String(rd.result)); };
+    rd.readAsDataURL(f);
+  });
+}
+wireFileInput(el('photoFile'), function(dta){ postPhotoData(dta, pendingCaption); });
+wireFileInput(el('photoFileCam'), function(dta){ postPhotoData(dta, pendingCaption); });
+wireFileInput(el('roomPhotoFile'), function(dta){ if (pendingRoomPhoto) setRoomPhotoFromDataUrl(pendingRoomPhoto, dta); });
 
 /* ---- foto de perfil: trocar e propagar ---- */
 function setAvatarFromDataUrl(dataUrl){
@@ -2395,7 +2883,8 @@ function profileComplete(){
 function renderPsAvatar(){
   var box = el('psAvatar'); if (!box) return;
   var nm = (el('edName') && el('edName').value) || me.name || 'V';
-  box.innerHTML = figSVG(iniOf(nm), me.color) + avatarImgHtml(me.token, me.avatar_v, 'ps-photo');
+  box.innerHTML = headSVG(iniOf(nm), me.color) + avatarImgHtml(me.token, me.avatar_v, 'ps-photo');
+  box.setAttribute('class', 'ps-avatar headring ' + ringCls(me.estado));
 }
 function openIdEdit(opts){
   opts = opts || {};
@@ -2449,6 +2938,38 @@ function setEstado(est){
   }
   if (est === 'invisible') toast('👻', 'modo invisível: você vê a sala, ninguém te vê');
   else if (wasGhost) toast('👋', 'você apareceu de novo');
+}
+
+/* ================= CONFIGURAÇÕES =================
+   O controle das notificações MORA aqui (reflete a inscrição real
+   deste aparelho), junto do liga/desliga dos sons e dos atalhos. */
+function openSettings(){ refreshSettings(); el('settingsSheet').classList.add('open'); }
+function closeSettings(){ el('settingsSheet').classList.remove('open'); }
+function refreshSettings(){
+  el('setVersion').textContent = 'PON real · versão ' + APP_VERSION;
+  var sb = el('setSoundBtn');
+  sb.textContent = me.sound ? 'ligado' : 'desligado';
+  sb.classList.toggle('on', !!me.sound);
+  el('setSoundSub').textContent = me.sound ? 'sons da sala e dos sinais: ligados' : 'sons da sala e dos sinais: desligados';
+  var pb = el('setPushBtn'), ps = el('setPushSub');
+  if (!pushSupported()){
+    pb.textContent = '—'; pb.classList.remove('on');
+    ps.textContent = (platformKind() === 'ios' && !isStandalone())
+      ? 'no iPhone, fixa a PON na tela inicial primeiro 📲'
+      : 'este navegador não aceita notificações da PON';
+    return;
+  }
+  if (window.Notification && Notification.permission === 'denied'){
+    pb.textContent = 'bloqueado'; pb.classList.remove('on');
+    ps.textContent = 'o navegador bloqueou — libera nas configurações do site pra conseguir ligar';
+    return;
+  }
+  ps.textContent = 'checando…';
+  pushSubscription().then(function(sub){
+    pb.textContent = sub ? 'ligado' : 'desligado';
+    pb.classList.toggle('on', !!sub);
+    ps.textContent = sub ? 'ligadas neste aparelho — app fechado, a PON te chama' : 'avisar quando te chamarem com o app fechado';
+  }).catch(function(){});
 }
 
 /* ================= PÁGINA DE INSTALAÇÃO ================= */
@@ -2546,6 +3067,40 @@ el('btnSound').addEventListener('click', function(ev){
   renderCanto();
   if (on){ SoundFX.unlock(); SoundFX.play('enter'); }
 });
+el('btnPush').addEventListener('click', function(ev){
+  ev.stopPropagation();
+  SoundFX.unlock();
+  if (!pushSupported()){
+    if (platformKind() === 'ios' && !isStandalone()){ openInstall(null); return; }
+    toast('🔔', 'este navegador não aceita notificações da PON');
+    return;
+  }
+  pushSubscription().then(function(sub){ if (sub) disablePush(); else enablePush(); });
+});
+el('btnSettings').addEventListener('click', function(ev){
+  ev.stopPropagation();
+  openSettings();
+});
+el('setClose').addEventListener('click', closeSettings);
+el('setSoundBtn').addEventListener('click', function(){
+  var on = SoundFX.toggle();
+  renderCanto();
+  if (on){ SoundFX.unlock(); SoundFX.play('enter'); }
+  refreshSettings();
+});
+el('setPushBtn').addEventListener('click', function(){
+  SoundFX.unlock();
+  if (!pushSupported()){
+    if (platformKind() === 'ios' && !isStandalone()){ closeSettings(); openInstall(null); }
+    return;
+  }
+  pushSubscription().then(function(sub){
+    var p = sub ? disablePush() : enablePush();
+    if (p && p.then) p.then(function(){ refreshSettings(); updatePushBtn(); });
+  });
+});
+el('setProfileRow').addEventListener('click', function(){ closeSettings(); openIdEdit(); });
+el('setInstallRow').addEventListener('click', function(){ closeSettings(); openInstall(null); });
 document.addEventListener('pointerdown', function(){ SoundFX.unlock(); }, { once: true });
 el('btnHall').addEventListener('click', leaveToHall);
 el('btnInvite').addEventListener('click', openInviteSheet);
@@ -2576,26 +3131,12 @@ setInterval(function(){
   if (!S.currentRoom) renderHall();
 }, 1000);
 
-/* ================= PWA (instalabilidade básica) ================= */
-(function(){
-  try {
-    var manifest = {
-      name: 'PON — suas salas', short_name: 'PON', start_url: '.', scope: '.',
-      display: 'standalone', background_color: '#eef5fb', theme_color: '#3f8fe0',
-      icons: [{ src: 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' rx=\'22\' fill=\'%233f8fe0\'/%3E%3Ctext x=\'50\' y=\'68\' font-size=\'52\' text-anchor=\'middle\' fill=\'white\' font-family=\'Arial\' font-weight=\'bold\'%3EP%3C/text%3E%3C/svg%3E', sizes: 'any', type: 'image/svg+xml' }]
-    };
-    var l = document.createElement('link');
-    l.rel = 'manifest';
-    l.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
-    document.head.appendChild(l);
-  } catch(e){}
-  try {
-    if ('serviceWorker' in navigator && window.Blob && URL.createObjectURL){
-      var swCode = 'self.addEventListener(\'fetch\', function(e){});';
-      navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], { type: 'text/javascript' }))).catch(function(){});
-    }
-  } catch(e){}
-})();
+/* ================= PWA =================
+   Manifest e service worker são ARQUIVOS do repo (manifest.webmanifest
+   ligado no <head> e sw.js registrado aqui) — o truque de blob não
+   serve pra push de verdade e foi aposentado. O sw.js cuida do push e
+   de não prender deploy novo em cache velho. */
+registerSW().then(function(){ updatePushBtn(); });
 
 /* ================= BOOT ================= */
 function boot(){
@@ -2616,6 +3157,11 @@ function boot(){
                  openPersonSheet: openPersonSheet, openLightbox: openLightbox, closeLightbox: closeLightbox,
                  avatarUrlFor: avatarUrl, setAvatarFromDataUrl: setAvatarFromDataUrl,
                  openIdEdit: openIdEdit, openInstall: openInstall, profileComplete: profileComplete,
+                 openSettings: openSettings, openRoomMenu: openRoomMenu, openMuralSheet: openMuralSheet,
+                 renameRoom: renameRoom, setRoomPhotoFromDataUrl: setRoomPhotoFromDataUrl,
+                 heartbeat: heartbeatNow, isPresent: isPresent,
+                 push: { supported: pushSupported, enable: enablePush, disable: disablePush,
+                         subscription: pushSubscription, notifyAbsent: notifyAbsent, updateBtn: updatePushBtn },
                  sound: SoundFX,
                  renderRoom: renderRoom, renderCanto: renderCanto, personDisplay: personDisplay };
   return DB.listMyRooms(me.token).then(function(data){
@@ -2636,12 +3182,16 @@ function boot(){
     /* ordem de chegada: 1) página de instalação (visitante novo, sem bloquear)
        2) portão de perfil (se incompleto) 3) sala do convite, se houver */
     var m = /#c\/([A-Za-z0-9]+)/.exec(location.hash || '');
+    var salaParam = null;
+    try { salaParam = new URLSearchParams(location.search || '').get('sala'); } catch(e){}
     function proceedFlow(){
       if (!profileComplete()){
         if (m) gateForCode(m[1]);
         else openIdEdit({ gate: 'first' });
       }
       else if (m) joinByCode(m[1]);
+      /* toque numa notificação: abre já dentro da sala (?sala=<id>) */
+      else if (salaParam && roomById(salaParam)) enterRoom(salaParam);
     }
     if (shouldShowInstall()) openInstall(proceedFlow);
     else proceedFlow();
