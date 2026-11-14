@@ -1136,6 +1136,7 @@
         lang = l;
         if (currentPlayer) currentPlayer.lang = l;
         applyLanguage();
+        saveGame();
       }
       function applyLanguage() {
         try { document.documentElement.lang = lang === "pt" ? "pt-BR" : lang; } catch (e) {}
@@ -1434,7 +1435,7 @@
         if (d.taps >= EGG_TAPS) {
           d.taps = 0; d.claimed = true; eggSave(d);
           totalCoins += EGG_PRIZE;
-          updateHud(); refreshWallet();
+          updateHud(); refreshWallet(); saveGame();
           eggCelebrate();
         } else eggSave(d);
       }
@@ -1460,6 +1461,113 @@
         btn.appendChild(p);
         setTimeout(function () { p.remove(); }, 1100);
       }
+
+      /* ---------------- persistence: the device save ----------------
+         The published game lives on a static host with NO runtime
+         behind it, so the device itself is the save file: ONE
+         versioned localStorage key (wuSaveV1) holding the whole
+         player state as JSON — identity, language, hood, wallet,
+         skins owned + equipped, journey stars, hearts and every
+         session player's personal bests. Saves ride the game's own
+         central update points (refreshWallet / updateHud /
+         recordScore / showResults / showMenu), throttled, plus a
+         hard save when the page hides. Loading happens at boot,
+         BEFORE the first-visit decision: a restored profile skips
+         the card and lands straight on the menu. Any storage
+         failure (private mode, quota, corrupt JSON) degrades to
+         the old session-only behaviour — the game never breaks
+         over a save. The easter egg keeps its own key (wuEggV1),
+         completely untouched. */
+      var SAVE_KEY = "wuSaveV1";
+      var saveTimer = null, lastSaveAt = 0, saveSuspended = false;
+      function collectSave() {
+        var players = [];
+        for (var i = 0; i < roomPlayers.length; i++) {
+          var p = roomPlayers[i];
+          players.push({ name: p.name, age: p.age || "", hood: (p.hood !== undefined ? p.hood : null),
+            bestEndless: p.bestEndless | 0, bestDaily: p.bestDaily | 0,
+            hasEndless: !!p.hasEndless, hasDaily: !!p.hasDaily, dailyKey: p.dailyKey || "" });
+        }
+        var skins = [];
+        for (var k in unlockedSkins) if (unlockedSkins[k]) skins.push(k);
+        return {
+          v: 1,
+          profileDone: !!profileDone,
+          playerName: playerName, playerAge: playerAge,
+          lang: lang,
+          hoodOverride: hoodOverride,
+          players: players,
+          currentPlayerName: currentPlayer ? currentPlayer.name : "",
+          totalCoins: totalCoins | 0,
+          unlockedSkins: skins,
+          currentSkinId: currentSkin ? currentSkin.id : "classic",
+          endless100Unlocked: !!endless100Unlocked,
+          levelStars: levelStars.slice(0, 15),
+          bestStageSession: bestStageSession | 0,
+          hearts: hearts, lastRefillAt: lastRefillAt,
+          muted: !!muted,
+          bandsShown: bandsShown
+        };
+      }
+      function saveGame() {
+        if (saveSuspended) return;
+        lastSaveAt = Date.now();
+        try { window.localStorage.setItem(SAVE_KEY, JSON.stringify(collectSave())); } catch (e) {}
+      }
+      function scheduleSave() {
+        if (saveSuspended) return;
+        var now = Date.now(), wait = 1000 - (now - lastSaveAt);
+        if (wait <= 0) { saveGame(); return; }
+        if (saveTimer) return;
+        saveTimer = setTimeout(function () { saveTimer = null; saveGame(); }, wait);
+      }
+      function loadSave() {
+        var s = null;
+        try { var raw = window.localStorage.getItem(SAVE_KEY); if (raw) s = JSON.parse(raw); } catch (e) {}
+        if (!s || !s.profileDone || !s.playerName) return false;
+        saveSuspended = true;
+        if (s.lang && LANG_ORDER.indexOf(s.lang) >= 0) lang = s.lang;
+        muted = !!s.muted;
+        var mb0 = document.getElementById("muteBtn"); if (mb0) mb0.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
+        roomPlayers = [];
+        if (s.players && s.players.length) {
+          for (var i = 0; i < s.players.length; i++) {
+            var sp = s.players[i];
+            if (!sp || !sp.name) continue;
+            var bd = sp.bestDaily | 0, hd = !!sp.hasDaily;
+            if (sp.dailyKey !== todayKey()) { bd = 0; hd = false; } // a daily best belongs to its own day
+            roomPlayers.push({ name: String(sp.name), age: sp.age || "", hood: (sp.hood !== undefined ? sp.hood : null),
+              bestEndless: sp.bestEndless | 0, bestDaily: bd, hasEndless: !!sp.hasEndless, hasDaily: hd,
+              dailyKey: todayKey() });
+          }
+        }
+        totalCoins = Math.max(0, s.totalCoins | 0);
+        walletSeenTotal = totalCoins; // no phantom count-up on return visits
+        unlockedSkins = { classic: true };
+        if (s.unlockedSkins) for (var j = 0; j < s.unlockedSkins.length; j++) unlockedSkins[s.unlockedSkins[j]] = true;
+        endless100Unlocked = !!s.endless100Unlocked;
+        if (endless100Unlocked) unlockedSkins["centurion"] = true;
+        if (s.currentSkinId) for (var li = 0; li < SKINS.length; li++)
+          if (SKINS[li].id === s.currentSkinId && unlockedSkins[SKINS[li].id]) currentSkin = SKINS[li];
+        if (s.levelStars) for (var si = 0; si < 15; si++) levelStars[si] = Math.min(3, Math.max(0, s.levelStars[si] | 0));
+        bestStageSession = Math.max(1, s.bestStageSession | 0);
+        if (typeof s.hearts === "number") hearts = Math.min(MAX_HEARTS, Math.max(0, s.hearts | 0));
+        if (s.lastRefillAt) lastRefillAt = +s.lastRefillAt || Date.now();
+        if (s.bandsShown && typeof s.bandsShown === "object") bandsShown = s.bandsShown;
+        // identity LAST: activatePlayer syncs bests, hood and labels
+        playerName = String(s.playerName); playerAge = s.playerAge || "";
+        profileDone = true;
+        var cp = activatePlayer(playerName, playerAge);
+        if (s.currentPlayerName && s.currentPlayerName !== playerName) {
+          for (var ci = 0; ci < roomPlayers.length; ci++)
+            if (roomPlayers[ci].name === s.currentPlayerName) { cp = activatePlayer(roomPlayers[ci].name, roomPlayers[ci].age); break; }
+        }
+        if (s.hoodOverride !== undefined && s.hoodOverride !== null) { hoodOverride = s.hoodOverride; if (cp) cp.hood = s.hoodOverride; }
+        saveSuspended = false;
+        return true;
+      }
+      document.addEventListener("visibilitychange", function () { if (document.hidden) saveGame(); });
+      window.addEventListener("pagehide", function () { saveGame(); });
 
       /* ---------------- session players & personal bests ----------------
          Every person who flies in this session is a player with
@@ -1501,6 +1609,7 @@
       function recordScore(mode, value) {
         ensureCurrentPlayer();
         if (mode === "daily") {
+          currentPlayer.dailyKey = todayKey();
           currentPlayer.hasDaily = true;
           if (value > currentPlayer.bestDaily) currentPlayer.bestDaily = value;
           bestDaily = currentPlayer.bestDaily;
@@ -1509,6 +1618,7 @@
           if (value > currentPlayer.bestEndless) currentPlayer.bestEndless = value;
           bestEndless = currentPlayer.bestEndless;
         }
+        saveGame();
       }
       function refreshScoreLabels() {
         var re = document.getElementById("recEndless");
@@ -1995,6 +2105,7 @@
         walletAnimId = requestAnimationFrame(frame);
       }
       function refreshWallet() {
+        scheduleSave();
         var el = document.getElementById("coinBalance"); if (el) el.textContent = totalCoins;
         var mt = document.getElementById("menuTop");
         if (mt) mt.innerHTML = (playerName ? "👋 " + playerName + " · " : "") + "🪙 " + totalCoins + " · " + heartsHTML();
@@ -2041,7 +2152,7 @@
           msg.textContent = tf("skinNeedMsg", { l: sk.unlockLevel, c: sk.cost, h: totalCoins });
           refreshSkins(); return;
         }
-        refreshSkins(); updateHud();
+        refreshSkins(); updateHud(); saveGame();
       }
       // called when a level is completed: unlocks that level's skin
       function checkSkinUnlocks(forLevel) {
@@ -6236,6 +6347,7 @@
         sndCeleb();
         setState("results");
         refreshJourneyBits();
+        saveGame();
       }
 
       /* ---------------- HUD ---------------- */
@@ -6265,6 +6377,7 @@
         boostLineEl.style.opacity = show ? "1" : "0";
       }
       function updateHud() {
+        scheduleSave();
         // ONE COIN COUNTER IN FLIGHT (this round): the pill shows a
         // single number — the coins of the CURRENT run. The session
         // total lives only on the menu / Looks / results screens.
@@ -6309,6 +6422,7 @@
         refreshJourneyBits();
         setState("menu");
         animateWalletCountUp(); // the run's coins visibly land in the wallet
+        saveGame();
       }
       var NODE_POS = [
         [12, 87], [30, 84.5], [50, 85.5], [70, 80], [86, 67],
@@ -6794,6 +6908,7 @@
       document.getElementById("outMenuBtn").addEventListener("click", function () { showMenu(); });
 
       /* ---------------- go ---------------- */
+      var hadSave = loadSave(); // device save first: a returning player skips the card
       buildScenery();
       resize();
       bird.y = H * 0.44;
@@ -6802,7 +6917,8 @@
       refreshSkins();
       updateHud();
       applyLanguage();
-      setState("onboard"); // first visit: nickname + age band, then the menu
+      if (hadSave) showMenu(); // returning player: straight to the menu, everything restored
+      else setState("onboard"); // first visit: nickname + age band, then the menu
       requestAnimationFrame(loop);
     </script>
     <script>
