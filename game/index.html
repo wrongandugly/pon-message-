@@ -201,18 +201,6 @@
       body[data-state="over"] #overOverlay,
       body[data-state="out"] #outOverlay { display: flex; }
       body[data-state="arrival"] #celebrOverlay { display: flex; }
-      body[data-state="democap"] #demoCapOverlay { display: flex; }
-      /* DEMO edition bits */
-      #demoRibbon {
-        display: inline-block; margin: 0 0 8px; padding: 3px 16px 4px;
-        border: 2.5px dashed var(--ink); border-radius: 999px;
-        font-weight: 800; letter-spacing: .35em; font-size: 14px;
-        transform: rotate(-2deg); background: #f2c230; color: #141416;
-      }
-      .demoTeaser { font-size: 21px; font-weight: 700; margin: 10px 0 4px; }
-      #demoCapRecord { display: none; font-size: 17px; margin: 2px 0 0; transform: rotate(-1.2deg); }
-      #demoCapRecord.show { display: block; }
-      #demoCapMascot { display: block; margin: 0 auto; }
       #celebrOverlay { pointer-events: none; align-items: flex-end; justify-content: center; padding-bottom: 8%; }
       #celebrOverlay .btn { pointer-events: auto; width: auto; padding: 10px 30px 12px; font-size: 22px; }
 
@@ -308,6 +296,17 @@
       #cardMascotBtn, #menuMascotBtn { display:block; margin:0 auto 4px; background:none; border:none; cursor:pointer; padding:0; }
       #cardMascotBtn canvas, #menuMascotBtn canvas { display:block; width:min(168px,44vw); height:auto; }
       #menuMascotBtn canvas { width:min(196px,52vw); }
+      /* easter egg: the 30-poke coin burst + floating prize */
+      #cardMascotBtn, #menuMascotBtn { position: relative; }
+      .eggCoin, .eggPlus { position: absolute; left: 50%; top: 42%; pointer-events: none; z-index: 5; }
+      .eggCoin { font-size: 20px; animation: eggFly .85s ease-out forwards; }
+      .eggPlus {
+        font-family: "Caveat", cursive; font-size: 30px; font-weight: 700; color: #a87408;
+        text-shadow: 0 2px 0 #fff, 0 0 8px #fff;
+        transform: translate(-50%, -50%); animation: eggUp 1.05s ease-out forwards;
+      }
+      @keyframes eggFly { to { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(.55); opacity: 0; } }
+      @keyframes eggUp { 0% { opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(-50%, -210%); opacity: 0; } }
       #onboardGo:disabled { opacity:.35; box-shadow:none; cursor:default; }
       .skinBtn { font-size:13.5px; font-weight:700; }
       .skinBtn .swatch { width:19px; height:19px; }
@@ -561,7 +560,6 @@
       <div class="overlay" id="menuOverlay">
         <div class="panel">
           <p id="menuTop" aria-label="coins and lives">🪙 0 · ♥♥♥♥♥</p>
-          <div><span id="demoRibbon">DEMO</span></div>
           <div id="menuWallet" aria-label="your wallet"><span class="wIcon" aria-hidden="true">👛</span><span class="wLabel">wallet</span><b id="menuWalletCount">0</b><span>coins</span><span id="menuWalletGain"></span></div>
           <button id="menuMascotBtn" type="button" aria-label="Tap the mascot"><canvas id="menuMascotCvs" width="392" height="350"></canvas></button>
           <h1>Wrong<br />and Ugly</h1>
@@ -597,10 +595,9 @@
         <div class="panel">
           <h2 data-i18n="looksTitle">Looks</h2>
           <p id="walletMenu">🪙 <b id="coinBalance">0</b> coins</p>
-          <p class="skinsTitle" data-i18n="skinsTitleLine">Every look is locked in the demo — a peek at the full version's wardrobe:</p>
+          <p class="skinsTitle" data-i18n="skinsTitleLine">Finish levels to unlock — or buy early with coins:</p>
           <div id="skinsGrid"></div>
           <p id="skinMsg"></p>
-          <p class="previewNote" data-i18n="demoCoinsHint">🪙 coins keep piling up in the demo — you spend them in the full version.</p>
           <button class="btn" id="skinsBack" type="button" data-i18n="back">← back</button>
         </div>
       </div>
@@ -688,22 +685,6 @@
           <button class="btn primary" id="againBtn" type="button">Again!</button>
           <button class="btn" id="shareBtnOver" type="button">📤 Share</button>
           <button class="btn" id="overMenuBtn" type="button">Back to menu</button>
-        </div>
-      </div>
-
-      <!-- DEMO CAP — Endless / Daily end HERE in the demo: reaching
-           gate 40 closes the run with this teaser screen -->
-      <div class="overlay" id="demoCapOverlay">
-        <div class="panel">
-          <canvas id="demoCapMascot" width="196" height="175"></canvas>
-          <h2 data-i18n="demoCapTitle">gate 40! the demo ends here.</h2>
-          <p class="scoreLabel" id="demoCapMode">endless mode</p>
-          <div class="bigScore" id="demoCapFinal">40</div>
-          <p id="demoCapRecord">★ new record! ★</p>
-          <p class="bestLine" id="demoCapLine"></p>
-          <p class="demoTeaser" data-i18n="demoTeaser">The full version is on its way…</p>
-          <button class="btn primary" id="demoCapMenuBtn" type="button">← back to menu</button>
-          <button class="btn" id="demoCapShareBtn" type="button">📤 Share</button>
         </div>
       </div>
 
@@ -1126,10 +1107,10 @@
       var lang = "en";
       (function () { var nl = (navigator.language || "en").toLowerCase(); lang = nl.indexOf("pt") === 0 ? "pt" : nl.indexOf("es") === 0 ? "es" : nl.indexOf("ja") === 0 ? "ja" : "en"; })();
       var STR = {
-        en: { cardTitle: "first: who are you?", cardTag: "five seconds. then you fly. tap him — he hates it.", language: "language", nickname: "your nickname", ageRange: "your age range", hoodColour: "your hood colour", previewSession: "This lives only in this session — nothing is stored or sent anywhere.", menuTag: "15 levels. one ugly city. good luck.", demoCapTitle: "gate 40! the demo ends here.", demoTeaser: "The full version is on its way…", demoCapScore: "your run: {n} gates", demoCapCoins: " · coins kept: 🪙 {c}", demoLockedLevel: "🔒 demo: levels 4–15 open in the full version.", demoSkinMsg: "🔒 locked in the demo — every look opens in the full version.", demoCoinsHint: "🪙 coins keep piling up in the demo — you spend them in the full version.", looksTitle: "Looks", skinsTitleLine: "Every look is locked in the demo — a peek at the full version's wardrobe:", back: "← back", backMenu: "← back to menu", mapSub: "15 levels over one doodle city — the sky changes colour as you go, morning to night. Every level is tap-fly", outTitle: "Out of lives!", paused: "⏸ paused", pausedTag: "the city waits. it is good at waiting.", soundOn: "🔊 sound: on", soundOff: "🔇 sound: off", resume: "▶ resume", restart: "↻ restart", quitMap: "← quit to map", quitMenu: "← quit to menu", journey: "🗺️ Journey — World 1", endless: "Endless Mode", endlessSub: "how far can you get?", daily: "📅 Daily Challenge", dailySub: "today's course — same gates for everyone", looks: "🎨 Looks", share: "📤 Share", start: "start ▶", pickAge: "pick your age range to start ▶", wallet: "wallet", coinsWord: "coins", yourRecord: "· your record: ", yourRecordToday: "· your record today: ", noRunToday: "· no run yet today", tapTakeOff: "tap to take off!", tapTakeOffDaily: "tap to take off — today's course!", tapLevel: "tap to take off — {g} gates, then the finish line!", copied: "✓ copied!", shareText: "I scored {n} on Wrong and Ugly — beat it!", clearedGate: "you cleared gate {s} of {t}", recordDaily: "your record in today's daily: ", recordEndless: "your record in endless: ", stageReached: " · stage reached: ", coinsThisRun: " · coins this run: 🪙 ", dailyChallenge: "Daily Challenge", endlessMode: "endless mode", failTitle: "you died. again.", failTitle15: "the storm wins. this time.", failStats: "Level {l} — {p}. Lives left: {h} of {m}.", failCoffee: " The BIG coffee can put you right back where you fell.", coinsLost: " 💥 that attempt's coins are gone (🪙 {n}) — finish a level without dying to keep its coins.", outStats: "The mascot needs a breather. {p} on level {l} that time.", resFinish: "★ finish · ", resEnough: "★ enough coins ({r}/{t})", resCoins: "coins: {r} of {t} for the 2nd star", resClean: "★ no hits. rude and clean.", resHits: "hits: {h} (a clean run earns the 3rd star)", resTime: "time: ", resBanked: " · coins banked: 🪙 {b} · wallet: 🪙 {w}", resNewLook: "🎨 new look unlocked: ", resNewLookTail: " — it's in Looks.", photo: "📸 photo posting: unlocked!", skinOnTag: " · on!", skinLockedTag: " · finish level {l} · or 🪙 {c} now", centurionTag: " · reach 100 in Endless · NO shortcut, NO coins", skinOnMsg: "{n} on. go fly ugly.", skinFreeMsg: "Level {l} done — {n} unlocked free.", skinBoughtMsg: "Bought early for {c} coins. Impatience: rewarded.", skinNeedMsg: "Finish level {l} to unlock it free — or buy early for 🪙 {c} (you have {h}).", centurionNoMsg: "The Centurion 100 has NO price and NO shortcut. Reach 100 in Endless — that's the whole deal.", levelComplete: "level {l}. done.", worldDone: "🏆 world 1. done.", outEndless: "Play Endless instead", outMap: "Back to map", outMenu: "Back to menu", again: "Again!", nextMap: "Back to the map ▶", replay: "Replay", retryStart: "Retry from the start", backToMap: "Back to map", continueBtn: "☕ Continue from here", continueSub: "free — pick up right where you fell", finishLine: "FINISH LINE!", finishSub: "fly through the flags!", levelWord: "LEVEL ", stageWord: "STAGE ", howHtml: "<b>One tap to flap.</b> Get through the gates. That's the whole tutorial.<br />☕ coffee = a shield · 🍵 tea = super flight · 🧲 magnet = coins come to you · 🌶️ {pepper} = breathe fire, smash ONE obstacle · 🍬 {candy} = he SHRINKS until he gets hit — tiny body, but the gates grow thorns and close in. Moving gates, wind, weird gravity, one rude bird and the odd missile included. No extra charge. Coins only count from a run you finish WITHOUT dying — and in Endless they are rare." },
-        pt: { cardTitle: "primeiro: quem é você?", cardTag: "cinco segundos. depois você voa. toca nele — ele odeia.", language: "idioma", nickname: "seu apelido", ageRange: "sua faixa etária", hoodColour: "cor do seu capuz", previewSession: "Isto vive só nesta sessão — nada é guardado nem enviado.", menuTag: "15 níveis. uma cidade feia. boa sorte.", demoCapTitle: "portão 40! a demo acaba aqui.", demoTeaser: "Aguarde a versão final…", demoCapScore: "sua corrida: {n} portões", demoCapCoins: " · moedas guardadas: 🪙 {c}", demoLockedLevel: "🔒 demo: os níveis 4–15 abrem na versão final.", demoSkinMsg: "🔒 bloqueado na demo — todos os visuais abrem na versão final.", demoCoinsHint: "🪙 as moedas continuam juntando na demo — você gasta elas na versão final.", looksTitle: "Visuais", skinsTitleLine: "Todos os visuais estão bloqueados na demo — uma espiada no guarda-roupa da versão final:", back: "← voltar", backMenu: "← voltar ao menu", mapSub: "15 níveis sobre uma cidade rabiscada — o céu muda de cor pelo caminho, da manhã à noite. Todo nível é toque-para-voar", outTitle: "Acabaram as vidas!", paused: "⏸ pausado", pausedTag: "a cidade espera. ela é boa nisso.", soundOn: "🔊 som: ligado", soundOff: "🔇 som: desligado", resume: "▶ continuar", restart: "↻ reiniciar", quitMap: "← sair para o mapa", quitMenu: "← sair para o menu", journey: "🗺️ Jornada — Mundo 1", endless: "Modo Infinito", endlessSub: "até onde você chega?", daily: "📅 Desafio Diário", dailySub: "o percurso de hoje — os mesmos portões para todos", looks: "🎨 Visuais", share: "📤 Compartilhar", start: "começar ▶", pickAge: "escolha sua faixa etária para começar ▶", wallet: "carteira", coinsWord: "moedas", yourRecord: "· seu recorde: ", yourRecordToday: "· seu recorde de hoje: ", noRunToday: "· nenhuma corrida hoje ainda", tapTakeOff: "toque para decolar!", tapTakeOffDaily: "toque para decolar — o percurso de hoje!", tapLevel: "toque para decolar — {g} portões e depois a linha de chegada!", copied: "✓ copiado!", shareText: "Fiz {n} no Wrong and Ugly — supera eu!", clearedGate: "você passou do portão {s} de {t}", recordDaily: "seu recorde no diário de hoje: ", recordEndless: "seu recorde no infinito: ", stageReached: " · estágio alcançado: ", coinsThisRun: " · moedas nesta corrida: 🪙 ", dailyChallenge: "Desafio Diário", endlessMode: "modo infinito", failTitle: "você morreu. de novo.", failTitle15: "a tempestade venceu. desta vez.", failStats: "Nível {l} — {p}. Vidas restantes: {h} de {m}.", failCoffee: " O café GRANDE pode te colocar de volta onde você caiu.", coinsLost: " 💥 as moedas dessa tentativa se foram (🪙 {n}) — termine um nível sem morrer para ficar com as moedas dele.", outStats: "O mascote precisa respirar. {p} no nível {l} dessa vez.", resFinish: "★ fim · ", resEnough: "★ moedas suficientes ({r}/{t})", resCoins: "moedas: {r} de {t} para a 2ª estrela", resClean: "★ nenhum golpe. limpo e mal-educado.", resHits: "golpes: {h} (uma corrida limpa ganha a 3ª estrela)", resTime: "tempo: ", resBanked: " · moedas guardadas: 🪙 {b} · carteira: 🪙 {w}", resNewLook: "🎨 visual novo desbloqueado: ", resNewLookTail: " — está em Visuais.", photo: "📸 postagem de fotos: desbloqueada!", skinOnTag: " · vestida!", skinLockedTag: " · termine o nível {l} · ou 🪙 {c} agora", centurionTag: " · chegue a 100 no Infinito · SEM atalho, SEM moedas", skinOnMsg: "{n} vestida. vai voar feio.", skinFreeMsg: "Nível {l} feito — {n} desbloqueada de graça.", skinBoughtMsg: "Comprada antes por {c} moedas. Impaciência: recompensada.", skinNeedMsg: "Termine o nível {l} para desbloquear de graça — ou compre antes por 🪙 {c} (você tem {h}).", centurionNoMsg: "A Centurion 100 NÃO tem preço nem atalho. Chegue a 100 no Infinito — é esse o acordo.", levelComplete: "nível {l}. feito.", worldDone: "🏆 mundo 1. feito.", outEndless: "Jogar o Infinito", outMap: "Voltar ao mapa", outMenu: "Voltar ao menu", again: "De novo!", nextMap: "Voltar ao mapa ▶", replay: "Jogar de novo", retryStart: "Recomeçar do início", backToMap: "Voltar ao mapa", continueBtn: "☕ Continuar daqui", continueSub: "grátis — continue de onde você caiu", finishLine: "LINHA DE CHEGADA!", finishSub: "voe pelas bandeiras!", levelWord: "NÍVEL ", stageWord: "ESTÁGIO ", howHtml: "<b>Um toque para bater a asa.</b> Passe pelos portões. Esse é o tutorial inteiro.<br />☕ café = um escudo · 🍵 chá = voo super · 🧲 ímã = as moedas vêm até você · 🌶️ {pepper} = cospe fogo, destrói UM obstáculo · 🍬 {candy} = ele ENCOLHE até levar um golpe — corpo pequeno, mas os portões ganham espinhos e se fecham. Portões móveis, vento, gravidade estranha, um passarinho mal-educado e um míssil ocasional incluídos. Sem custo extra. Moedas só valem de uma corrida que você termina SEM morrer — e no Infinito elas são raras." },
-        es: { cardTitle: "primero: ¿quién eres?", cardTag: "cinco segundos. luego vuelas. tócalo — lo odia.", language: "idioma", nickname: "tu apodo", ageRange: "tu rango de edad", hoodColour: "color de tu capucha", previewSession: "Esto vive solo en esta sesión — nada se guarda ni se envía.", menuTag: "15 niveles. una ciudad fea. buena suerte.", demoCapTitle: "¡puerta 40! la demo termina aquí.", demoTeaser: "La versión completa está en camino…", demoCapScore: "tu carrera: {n} puertas", demoCapCoins: " · monedas guardadas: 🪙 {c}", demoLockedLevel: "🔒 demo: los niveles 4–15 se abren en la versión completa.", demoSkinMsg: "🔒 bloqueado en la demo — todos los aspectos se abren en la versión completa.", demoCoinsHint: "🪙 las monedas se siguen juntando en la demo — las gastas en la versión completa.", looksTitle: "Aspectos", skinsTitleLine: "Todos los aspectos están bloqueados en la demo — un vistazo al guardarropa de la versión completa:", back: "← volver", backMenu: "← volver al menú", mapSub: "15 niveles sobre una ciudad garabateada — el cielo cambia de color, de la mañana a la noche. Todo nivel es tocar-para-volar", outTitle: "¡Sin vidas!", paused: "⏸ pausa", pausedTag: "la ciudad espera. se le da bien.", soundOn: "🔊 sonido: sí", soundOff: "🔇 sonido: no", resume: "▶ seguir", restart: "↻ reiniciar", quitMap: "← salir al mapa", quitMenu: "← salir al menú", journey: "🗺️ Viaje — Mundo 1", endless: "Modo Infinito", endlessSub: "¿hasta dónde llegas?", daily: "📅 Desafío Diario", dailySub: "el recorrido de hoy — las mismas puertas para todos", looks: "🎨 Aspectos", share: "📤 Compartir", start: "empezar ▶", pickAge: "elige tu rango de edad para empezar ▶", wallet: "cartera", coinsWord: "monedas", yourRecord: "· tu récord: ", yourRecordToday: "· tu récord de hoy: ", noRunToday: "· aún sin carreras hoy", tapTakeOff: "¡toca para despegar!", tapTakeOffDaily: "¡toca para despegar — el recorrido de hoy!", tapLevel: "toca para despegar — {g} puertas y luego la meta!", copied: "✓ ¡copiado!", shareText: "Hice {n} en Wrong and Ugly — ¡supérame!", clearedGate: "pasaste la puerta {s} de {t}", recordDaily: "tu récord en el diario de hoy: ", recordEndless: "tu récord en infinito: ", stageReached: " · etapa alcanzada: ", coinsThisRun: " · monedas en esta carrera: 🪙 ", dailyChallenge: "Desafío Diario", endlessMode: "modo infinito", failTitle: "moriste. otra vez.", failTitle15: "la tormenta gana. esta vez.", failStats: "Nivel {l} — {p}. Vidas restantes: {h} de {m}.", failCoffee: " El café GRANDE puede devolverte justo donde caíste.", coinsLost: " 💥 las monedas de ese intento se fueron (🪙 {n}) — termina un nivel sin morir para quedarte sus monedas.", outStats: "La mascota necesita un respiro. {p} en el nivel {l} esa vez.", resFinish: "★ fin · ", resEnough: "★ monedas suficientes ({r}/{t})", resCoins: "monedas: {r} de {t} para la 2ª estrella", resClean: "★ sin golpes. limpio y grosero.", resHits: "golpes: {h} (una carrera limpia gana la 3ª estrella)", resTime: "tiempo: ", resBanked: " · monedas guardadas: 🪙 {b} · cartera: 🪙 {w}", resNewLook: "🎨 nuevo aspecto desbloqueado: ", resNewLookTail: " — está en Aspectos.", photo: "📸 publicación de fotos: ¡desbloqueada!", skinOnTag: " · ¡puesto!", skinLockedTag: " · termina el nivel {l} · o 🪙 {c} ahora", centurionTag: " · llega a 100 en Infinito · SIN atajo, SIN monedas", skinOnMsg: "{n} puesto. a volar feo.", skinFreeMsg: "Nivel {l} hecho — {n} desbloqueado gratis.", skinBoughtMsg: "Comprado antes por {c} monedas. Impaciencia: recompensada.", skinNeedMsg: "Termina el nivel {l} para desbloquearlo gratis — o cómpralo antes por 🪙 {c} (tienes {h}).", centurionNoMsg: "La Centurion 100 NO tiene precio ni atajo. Llega a 100 en Infinito — ese es el trato.", levelComplete: "nivel {l}. hecho.", worldDone: "🏆 mundo 1. hecho.", outEndless: "Jugar Infinito", outMap: "Volver al mapa", outMenu: "Volver al menú", again: "¡Otra vez!", nextMap: "Volver al mapa ▶", replay: "Repetir", retryStart: "Reintentar desde el inicio", backToMap: "Volver al mapa", continueBtn: "☕ Continuar desde aquí", continueSub: "gratis — sigue desde donde caíste", finishLine: "¡META!", finishSub: "¡vuela entre las banderas!", levelWord: "NIVEL ", stageWord: "ETAPA ", howHtml: "<b>Un toque para aletear.</b> Pasa las puertas. Ese es todo el tutorial.<br />☕ café = un escudo · 🍵 té = súper vuelo · 🧲 imán = las monedas vienen a ti · 🌶️ {pepper} = escupe fuego, rompe UN obstáculo · 🍬 {candy} = se ENCOGE hasta que le pegan — cuerpo pequeño, pero las puertas ganan espinas y se cierran. Puertas móviles, viento, gravedad rara, un pájaro grosero y un misil ocasional incluidos. Sin coste extra. Las monedas solo cuentan de una carrera que terminas SIN morir — y en Infinito son raras." },
-        ja: { cardTitle: "まず: あなたはだれ?", cardTag: "5秒だけ。そのあと飛べます。彼をタップ — 嫌がります。", language: "言語", nickname: "ニックネーム", ageRange: "年齢層", hoodColour: "フードの色", previewSession: "これはこのセッションだけのもの — 保存も送信もされません。", menuTag: "15レベル。1つのブサイクな街。がんばれ。", demoCapTitle: "ゲート40! デモはここまで。", demoTeaser: "完全版をお楽しみに…", demoCapScore: "今回の記録: ゲート{n}個", demoCapCoins: " · 獲得コイン: 🪙 {c}", demoLockedLevel: "🔒 デモ: レベル4–15は完全版で開きます。", demoSkinMsg: "🔒 デモではロック中 — すべての見た目は完全版で開きます。", demoCoinsHint: "🪙 コインはデモでも貯まります — 使えるのは完全版で。", looksTitle: "見た目", skinsTitleLine: "デモでは全ての見た目がロック中 — 完全版のワードローブをちら見せ:", back: "← もどる", backMenu: "← メニューへもどる", mapSub: "落書きの街の上に15レベル — 空の色は朝から夜へ変わります。全レベルがタップで飛行", outTitle: "ライフがありません!", paused: "⏸ 一時停止", pausedTag: "街は待っています。待つのが得意です。", soundOn: "🔊 サウンド: オン", soundOff: "🔇 サウンド: オフ", resume: "▶ つづける", restart: "↻ リスタート", quitMap: "← マップへ出る", quitMenu: "← メニューへ出る", journey: "🗺️ ジャーニー — ワールド1", endless: "エンドレスモード", endlessSub: "どこまで行ける?", daily: "📅 デイリーチャレンジ", dailySub: "今日のコース — みんな同じゲート", looks: "🎨 見た目", share: "📤 シェア", start: "スタート ▶", pickAge: "年齢層を選んでスタート ▶", wallet: "さいふ", coinsWord: "コイン", yourRecord: "· あなたの記録: ", yourRecordToday: "· 今日のあなたの記録: ", noRunToday: "· 今日はまだ記録なし", tapTakeOff: "タップで離陸!", tapTakeOffDaily: "タップで離陸 — 今日のコース!", tapLevel: "タップで離陸 — ゲート{g}個、その先にゴール!", copied: "✓ コピー!", shareText: "Wrong and Uglyで{n}点を取ったよ — 勝てる?", clearedGate: "ゲート{t}個中{s}個を通過", recordDaily: "今日のデイリーでのあなたの記録: ", recordEndless: "エンドレスでのあなたの記録: ", stageReached: " · 到達ステージ: ", coinsThisRun: " · 今回のコイン: 🪙 ", dailyChallenge: "デイリーチャレンジ", endlessMode: "エンドレスモード", failTitle: "死んだ。また。", failTitle15: "嵐の勝ち。今回は。", failStats: "レベル{l} — {p}。残りライフ: {h}/{m}。", failCoffee: " ビッグコーヒーが落ちた場所に戻してくれます。", coinsLost: " 💥 その挑戦のコインは消えました (🪙 {n}) — 死なずにレベルを終えるとコインが残ります。", outStats: "マスコットは休憩が必要です。レベル{l}で{p}でした。", resFinish: "★ クリア · ", resEnough: "★ コイン十分 ({r}/{t})", resCoins: "コイン: 2つ目の星まで {r}/{t}", resClean: "★ ノーヒット。きれいで失礼。", resHits: "ヒット: {h} (クリーンランで3つ目の星)", resTime: "タイム: ", resBanked: " · 貯まったコイン: 🪙 {b} · さいふ: 🪙 {w}", resNewLook: "🎨 新しい見た目を解放: ", resNewLookTail: " — 「見た目」にあります。", photo: "📸 写真投稿: 解放!", skinOnTag: " · 装着中!", skinLockedTag: " · レベル{l}をクリア · または今 🪙 {c}", centurionTag: " · エンドレスで100到達 · 近道なし、コイン不可", skinOnMsg: "{n}を装着。ブサイクに飛べ。", skinFreeMsg: "レベル{l}クリア — {n}を無料で解放。", skinBoughtMsg: "{c}コインで先行購入。不精さ: 報酬あり。", skinNeedMsg: "レベル{l}をクリアすれば無料解放 — 先行購入は 🪙 {c} (所持 {h})。", centurionNoMsg: "センチュリオン100に価格も近道もありません。エンドレスで100到達 — それが条件です。", levelComplete: "レベル{l}。クリア。", worldDone: "🏆 ワールド1。制覇。", outEndless: "エンドレスで遊ぶ", outMap: "マップへもどる", outMenu: "メニューへもどる", again: "もう一度!", nextMap: "マップへもどる ▶", replay: "リプレイ", retryStart: "最初からリトライ", backToMap: "マップへもどる", continueBtn: "☕ ここからつづける", continueSub: "無料 — 落ちた場所からつづけられます", finishLine: "ゴール!", finishSub: "旗をくぐって飛べ!", levelWord: "レベル", stageWord: "ステージ", howHtml: "<b>1タップで羽ばたき。</b> ゲートをくぐる。それだけがチュートリアル。<br />☕ コーヒー = シールド · 🍵 お茶 = スーパー飛行 · 🧲 磁石 = コインが寄ってくる · 🌶️ {pepper} = 炎を吐いて障害物1つを粉砕 · 🍬 {candy} = 当たるまで縮む — 体は小さいがゲートにトゲが生えて狭くなる。動くゲート、風、変な重力、失礼な鳥、たまにミサイル込み。追加料金なし。コインは死なずに終えたランだけが残ります — エンドレスではレアです。" }
+        en: { cardTitle: "first: who are you?", cardTag: "five seconds. then you fly. tap him — he hates it.", language: "language", nickname: "your nickname", ageRange: "your age range", hoodColour: "your hood colour", previewSession: "This lives only in this session — nothing is stored or sent anywhere.", menuTag: "15 levels. one ugly city. good luck.", looksTitle: "Looks", skinsTitleLine: "Finish levels to unlock — or buy early with coins:", back: "← back", backMenu: "← back to menu", mapSub: "15 levels over one doodle city — the sky changes colour as you go, morning to night. Every level is tap-fly", outTitle: "Out of lives!", paused: "⏸ paused", pausedTag: "the city waits. it is good at waiting.", soundOn: "🔊 sound: on", soundOff: "🔇 sound: off", resume: "▶ resume", restart: "↻ restart", quitMap: "← quit to map", quitMenu: "← quit to menu", journey: "🗺️ Journey — World 1", endless: "Endless Mode", endlessSub: "how far can you get?", daily: "📅 Daily Challenge", dailySub: "today's course — same gates for everyone", looks: "🎨 Looks", share: "📤 Share", start: "start ▶", pickAge: "pick your age range to start ▶", wallet: "wallet", coinsWord: "coins", yourRecord: "· your record: ", yourRecordToday: "· your record today: ", noRunToday: "· no run yet today", tapTakeOff: "tap to take off!", tapTakeOffDaily: "tap to take off — today's course!", tapLevel: "tap to take off — {g} gates, then the finish line!", copied: "✓ copied!", shareText: "I scored {n} on Wrong and Ugly — beat it!", clearedGate: "you cleared gate {s} of {t}", recordDaily: "your record in today's daily: ", recordEndless: "your record in endless: ", stageReached: " · stage reached: ", coinsThisRun: " · coins this run: 🪙 ", dailyChallenge: "Daily Challenge", endlessMode: "endless mode", failTitle: "you died. again.", failTitle15: "the storm wins. this time.", failStats: "Level {l} — {p}. Lives left: {h} of {m}.", failCoffee: " The BIG coffee can put you right back where you fell.", coinsLost: " 💥 that attempt's coins are gone (🪙 {n}) — finish a level without dying to keep its coins.", outStats: "The mascot needs a breather. {p} on level {l} that time.", resFinish: "★ finish · ", resEnough: "★ enough coins ({r}/{t})", resCoins: "coins: {r} of {t} for the 2nd star", resClean: "★ no hits. rude and clean.", resHits: "hits: {h} (a clean run earns the 3rd star)", resTime: "time: ", resBanked: " · coins banked: 🪙 {b} · wallet: 🪙 {w}", resNewLook: "🎨 new look unlocked: ", resNewLookTail: " — it's in Looks.", photo: "📸 photo posting: unlocked!", skinOnTag: " · on!", skinLockedTag: " · finish level {l} · or 🪙 {c} now", centurionTag: " · reach 100 in Endless · NO shortcut, NO coins", skinOnMsg: "{n} on. go fly ugly.", skinFreeMsg: "Level {l} done — {n} unlocked free.", skinBoughtMsg: "Bought early for {c} coins. Impatience: rewarded.", skinNeedMsg: "Finish level {l} to unlock it free — or buy early for 🪙 {c} (you have {h}).", centurionNoMsg: "The Centurion 100 has NO price and NO shortcut. Reach 100 in Endless — that's the whole deal.", levelComplete: "level {l}. done.", worldDone: "🏆 world 1. done.", outEndless: "Play Endless instead", outMap: "Back to map", outMenu: "Back to menu", again: "Again!", nextMap: "Back to the map ▶", replay: "Replay", retryStart: "Retry from the start", backToMap: "Back to map", continueBtn: "☕ Continue from here", continueSub: "free — pick up right where you fell", finishLine: "FINISH LINE!", finishSub: "fly through the flags!", levelWord: "LEVEL ", stageWord: "STAGE ", howHtml: "<b>One tap to flap.</b> Get through the gates. That's the whole tutorial.<br />☕ coffee = a shield · 🍵 tea = super flight · 🧲 magnet = coins come to you · 🌶️ {pepper} = breathe fire, smash ONE obstacle · 🍬 {candy} = he SHRINKS until he gets hit — tiny body, but the gates grow thorns and close in. Moving gates, wind, weird gravity, one rude bird and the odd missile included. No extra charge. Coins only count from a run you finish WITHOUT dying — and in Endless they are rare." },
+        pt: { cardTitle: "primeiro: quem é você?", cardTag: "cinco segundos. depois você voa. toca nele — ele odeia.", language: "idioma", nickname: "seu apelido", ageRange: "sua faixa etária", hoodColour: "cor do seu capuz", previewSession: "Isto vive só nesta sessão — nada é guardado nem enviado.", menuTag: "15 níveis. uma cidade feia. boa sorte.", looksTitle: "Visuais", skinsTitleLine: "Termine níveis para desbloquear — ou compre antes com moedas:", back: "← voltar", backMenu: "← voltar ao menu", mapSub: "15 níveis sobre uma cidade rabiscada — o céu muda de cor pelo caminho, da manhã à noite. Todo nível é toque-para-voar", outTitle: "Acabaram as vidas!", paused: "⏸ pausado", pausedTag: "a cidade espera. ela é boa nisso.", soundOn: "🔊 som: ligado", soundOff: "🔇 som: desligado", resume: "▶ continuar", restart: "↻ reiniciar", quitMap: "← sair para o mapa", quitMenu: "← sair para o menu", journey: "🗺️ Jornada — Mundo 1", endless: "Modo Infinito", endlessSub: "até onde você chega?", daily: "📅 Desafio Diário", dailySub: "o percurso de hoje — os mesmos portões para todos", looks: "🎨 Visuais", share: "📤 Compartilhar", start: "começar ▶", pickAge: "escolha sua faixa etária para começar ▶", wallet: "carteira", coinsWord: "moedas", yourRecord: "· seu recorde: ", yourRecordToday: "· seu recorde de hoje: ", noRunToday: "· nenhuma corrida hoje ainda", tapTakeOff: "toque para decolar!", tapTakeOffDaily: "toque para decolar — o percurso de hoje!", tapLevel: "toque para decolar — {g} portões e depois a linha de chegada!", copied: "✓ copiado!", shareText: "Fiz {n} no Wrong and Ugly — supera eu!", clearedGate: "você passou do portão {s} de {t}", recordDaily: "seu recorde no diário de hoje: ", recordEndless: "seu recorde no infinito: ", stageReached: " · estágio alcançado: ", coinsThisRun: " · moedas nesta corrida: 🪙 ", dailyChallenge: "Desafio Diário", endlessMode: "modo infinito", failTitle: "você morreu. de novo.", failTitle15: "a tempestade venceu. desta vez.", failStats: "Nível {l} — {p}. Vidas restantes: {h} de {m}.", failCoffee: " O café GRANDE pode te colocar de volta onde você caiu.", coinsLost: " 💥 as moedas dessa tentativa se foram (🪙 {n}) — termine um nível sem morrer para ficar com as moedas dele.", outStats: "O mascote precisa respirar. {p} no nível {l} dessa vez.", resFinish: "★ fim · ", resEnough: "★ moedas suficientes ({r}/{t})", resCoins: "moedas: {r} de {t} para a 2ª estrela", resClean: "★ nenhum golpe. limpo e mal-educado.", resHits: "golpes: {h} (uma corrida limpa ganha a 3ª estrela)", resTime: "tempo: ", resBanked: " · moedas guardadas: 🪙 {b} · carteira: 🪙 {w}", resNewLook: "🎨 visual novo desbloqueado: ", resNewLookTail: " — está em Visuais.", photo: "📸 postagem de fotos: desbloqueada!", skinOnTag: " · vestida!", skinLockedTag: " · termine o nível {l} · ou 🪙 {c} agora", centurionTag: " · chegue a 100 no Infinito · SEM atalho, SEM moedas", skinOnMsg: "{n} vestida. vai voar feio.", skinFreeMsg: "Nível {l} feito — {n} desbloqueada de graça.", skinBoughtMsg: "Comprada antes por {c} moedas. Impaciência: recompensada.", skinNeedMsg: "Termine o nível {l} para desbloquear de graça — ou compre antes por 🪙 {c} (você tem {h}).", centurionNoMsg: "A Centurion 100 NÃO tem preço nem atalho. Chegue a 100 no Infinito — é esse o acordo.", levelComplete: "nível {l}. feito.", worldDone: "🏆 mundo 1. feito.", outEndless: "Jogar o Infinito", outMap: "Voltar ao mapa", outMenu: "Voltar ao menu", again: "De novo!", nextMap: "Voltar ao mapa ▶", replay: "Jogar de novo", retryStart: "Recomeçar do início", backToMap: "Voltar ao mapa", continueBtn: "☕ Continuar daqui", continueSub: "grátis — continue de onde você caiu", finishLine: "LINHA DE CHEGADA!", finishSub: "voe pelas bandeiras!", levelWord: "NÍVEL ", stageWord: "ESTÁGIO ", howHtml: "<b>Um toque para bater a asa.</b> Passe pelos portões. Esse é o tutorial inteiro.<br />☕ café = um escudo · 🍵 chá = voo super · 🧲 ímã = as moedas vêm até você · 🌶️ {pepper} = cospe fogo, destrói UM obstáculo · 🍬 {candy} = ele ENCOLHE até levar um golpe — corpo pequeno, mas os portões ganham espinhos e se fecham. Portões móveis, vento, gravidade estranha, um passarinho mal-educado e um míssil ocasional incluídos. Sem custo extra. Moedas só valem de uma corrida que você termina SEM morrer — e no Infinito elas são raras." },
+        es: { cardTitle: "primero: ¿quién eres?", cardTag: "cinco segundos. luego vuelas. tócalo — lo odia.", language: "idioma", nickname: "tu apodo", ageRange: "tu rango de edad", hoodColour: "color de tu capucha", previewSession: "Esto vive solo en esta sesión — nada se guarda ni se envía.", menuTag: "15 niveles. una ciudad fea. buena suerte.", looksTitle: "Aspectos", skinsTitleLine: "Termina niveles para desbloquear — o compra antes con monedas:", back: "← volver", backMenu: "← volver al menú", mapSub: "15 niveles sobre una ciudad garabateada — el cielo cambia de color, de la mañana a la noche. Todo nivel es tocar-para-volar", outTitle: "¡Sin vidas!", paused: "⏸ pausa", pausedTag: "la ciudad espera. se le da bien.", soundOn: "🔊 sonido: sí", soundOff: "🔇 sonido: no", resume: "▶ seguir", restart: "↻ reiniciar", quitMap: "← salir al mapa", quitMenu: "← salir al menú", journey: "🗺️ Viaje — Mundo 1", endless: "Modo Infinito", endlessSub: "¿hasta dónde llegas?", daily: "📅 Desafío Diario", dailySub: "el recorrido de hoy — las mismas puertas para todos", looks: "🎨 Aspectos", share: "📤 Compartir", start: "empezar ▶", pickAge: "elige tu rango de edad para empezar ▶", wallet: "cartera", coinsWord: "monedas", yourRecord: "· tu récord: ", yourRecordToday: "· tu récord de hoy: ", noRunToday: "· aún sin carreras hoy", tapTakeOff: "¡toca para despegar!", tapTakeOffDaily: "¡toca para despegar — el recorrido de hoy!", tapLevel: "toca para despegar — {g} puertas y luego la meta!", copied: "✓ ¡copiado!", shareText: "Hice {n} en Wrong and Ugly — ¡supérame!", clearedGate: "pasaste la puerta {s} de {t}", recordDaily: "tu récord en el diario de hoy: ", recordEndless: "tu récord en infinito: ", stageReached: " · etapa alcanzada: ", coinsThisRun: " · monedas en esta carrera: 🪙 ", dailyChallenge: "Desafío Diario", endlessMode: "modo infinito", failTitle: "moriste. otra vez.", failTitle15: "la tormenta gana. esta vez.", failStats: "Nivel {l} — {p}. Vidas restantes: {h} de {m}.", failCoffee: " El café GRANDE puede devolverte justo donde caíste.", coinsLost: " 💥 las monedas de ese intento se fueron (🪙 {n}) — termina un nivel sin morir para quedarte sus monedas.", outStats: "La mascota necesita un respiro. {p} en el nivel {l} esa vez.", resFinish: "★ fin · ", resEnough: "★ monedas suficientes ({r}/{t})", resCoins: "monedas: {r} de {t} para la 2ª estrella", resClean: "★ sin golpes. limpio y grosero.", resHits: "golpes: {h} (una carrera limpia gana la 3ª estrella)", resTime: "tiempo: ", resBanked: " · monedas guardadas: 🪙 {b} · cartera: 🪙 {w}", resNewLook: "🎨 nuevo aspecto desbloqueado: ", resNewLookTail: " — está en Aspectos.", photo: "📸 publicación de fotos: ¡desbloqueada!", skinOnTag: " · ¡puesto!", skinLockedTag: " · termina el nivel {l} · o 🪙 {c} ahora", centurionTag: " · llega a 100 en Infinito · SIN atajo, SIN monedas", skinOnMsg: "{n} puesto. a volar feo.", skinFreeMsg: "Nivel {l} hecho — {n} desbloqueado gratis.", skinBoughtMsg: "Comprado antes por {c} monedas. Impaciencia: recompensada.", skinNeedMsg: "Termina el nivel {l} para desbloquearlo gratis — o cómpralo antes por 🪙 {c} (tienes {h}).", centurionNoMsg: "La Centurion 100 NO tiene precio ni atajo. Llega a 100 en Infinito — ese es el trato.", levelComplete: "nivel {l}. hecho.", worldDone: "🏆 mundo 1. hecho.", outEndless: "Jugar Infinito", outMap: "Volver al mapa", outMenu: "Volver al menú", again: "¡Otra vez!", nextMap: "Volver al mapa ▶", replay: "Repetir", retryStart: "Reintentar desde el inicio", backToMap: "Volver al mapa", continueBtn: "☕ Continuar desde aquí", continueSub: "gratis — sigue desde donde caíste", finishLine: "¡META!", finishSub: "¡vuela entre las banderas!", levelWord: "NIVEL ", stageWord: "ETAPA ", howHtml: "<b>Un toque para aletear.</b> Pasa las puertas. Ese es todo el tutorial.<br />☕ café = un escudo · 🍵 té = súper vuelo · 🧲 imán = las monedas vienen a ti · 🌶️ {pepper} = escupe fuego, rompe UN obstáculo · 🍬 {candy} = se ENCOGE hasta que le pegan — cuerpo pequeño, pero las puertas ganan espinas y se cierran. Puertas móviles, viento, gravedad rara, un pájaro grosero y un misil ocasional incluidos. Sin coste extra. Las monedas solo cuentan de una carrera que terminas SIN morir — y en Infinito son raras." },
+        ja: { cardTitle: "まず: あなたはだれ?", cardTag: "5秒だけ。そのあと飛べます。彼をタップ — 嫌がります。", language: "言語", nickname: "ニックネーム", ageRange: "年齢層", hoodColour: "フードの色", previewSession: "これはこのセッションだけのもの — 保存も送信もされません。", menuTag: "15レベル。1つのブサイクな街。がんばれ。", looksTitle: "見た目", skinsTitleLine: "レベルをクリアして解放 — コインで先行購入も:", back: "← もどる", backMenu: "← メニューへもどる", mapSub: "落書きの街の上に15レベル — 空の色は朝から夜へ変わります。全レベルがタップで飛行", outTitle: "ライフがありません!", paused: "⏸ 一時停止", pausedTag: "街は待っています。待つのが得意です。", soundOn: "🔊 サウンド: オン", soundOff: "🔇 サウンド: オフ", resume: "▶ つづける", restart: "↻ リスタート", quitMap: "← マップへ出る", quitMenu: "← メニューへ出る", journey: "🗺️ ジャーニー — ワールド1", endless: "エンドレスモード", endlessSub: "どこまで行ける?", daily: "📅 デイリーチャレンジ", dailySub: "今日のコース — みんな同じゲート", looks: "🎨 見た目", share: "📤 シェア", start: "スタート ▶", pickAge: "年齢層を選んでスタート ▶", wallet: "さいふ", coinsWord: "コイン", yourRecord: "· あなたの記録: ", yourRecordToday: "· 今日のあなたの記録: ", noRunToday: "· 今日はまだ記録なし", tapTakeOff: "タップで離陸!", tapTakeOffDaily: "タップで離陸 — 今日のコース!", tapLevel: "タップで離陸 — ゲート{g}個、その先にゴール!", copied: "✓ コピー!", shareText: "Wrong and Uglyで{n}点を取ったよ — 勝てる?", clearedGate: "ゲート{t}個中{s}個を通過", recordDaily: "今日のデイリーでのあなたの記録: ", recordEndless: "エンドレスでのあなたの記録: ", stageReached: " · 到達ステージ: ", coinsThisRun: " · 今回のコイン: 🪙 ", dailyChallenge: "デイリーチャレンジ", endlessMode: "エンドレスモード", failTitle: "死んだ。また。", failTitle15: "嵐の勝ち。今回は。", failStats: "レベル{l} — {p}。残りライフ: {h}/{m}。", failCoffee: " ビッグコーヒーが落ちた場所に戻してくれます。", coinsLost: " 💥 その挑戦のコインは消えました (🪙 {n}) — 死なずにレベルを終えるとコインが残ります。", outStats: "マスコットは休憩が必要です。レベル{l}で{p}でした。", resFinish: "★ クリア · ", resEnough: "★ コイン十分 ({r}/{t})", resCoins: "コイン: 2つ目の星まで {r}/{t}", resClean: "★ ノーヒット。きれいで失礼。", resHits: "ヒット: {h} (クリーンランで3つ目の星)", resTime: "タイム: ", resBanked: " · 貯まったコイン: 🪙 {b} · さいふ: 🪙 {w}", resNewLook: "🎨 新しい見た目を解放: ", resNewLookTail: " — 「見た目」にあります。", photo: "📸 写真投稿: 解放!", skinOnTag: " · 装着中!", skinLockedTag: " · レベル{l}をクリア · または今 🪙 {c}", centurionTag: " · エンドレスで100到達 · 近道なし、コイン不可", skinOnMsg: "{n}を装着。ブサイクに飛べ。", skinFreeMsg: "レベル{l}クリア — {n}を無料で解放。", skinBoughtMsg: "{c}コインで先行購入。不精さ: 報酬あり。", skinNeedMsg: "レベル{l}をクリアすれば無料解放 — 先行購入は 🪙 {c} (所持 {h})。", centurionNoMsg: "センチュリオン100に価格も近道もありません。エンドレスで100到達 — それが条件です。", levelComplete: "レベル{l}。クリア。", worldDone: "🏆 ワールド1。制覇。", outEndless: "エンドレスで遊ぶ", outMap: "マップへもどる", outMenu: "メニューへもどる", again: "もう一度!", nextMap: "マップへもどる ▶", replay: "リプレイ", retryStart: "最初からリトライ", backToMap: "マップへもどる", continueBtn: "☕ ここからつづける", continueSub: "無料 — 落ちた場所からつづけられます", finishLine: "ゴール!", finishSub: "旗をくぐって飛べ!", levelWord: "レベル", stageWord: "ステージ", howHtml: "<b>1タップで羽ばたき。</b> ゲートをくぐる。それだけがチュートリアル。<br />☕ コーヒー = シールド · 🍵 お茶 = スーパー飛行 · 🧲 磁石 = コインが寄ってくる · 🌶️ {pepper} = 炎を吐いて障害物1つを粉砕 · 🍬 {candy} = 当たるまで縮む — 体は小さいがゲートにトゲが生えて狭くなる。動くゲート、風、変な重力、失礼な鳥、たまにミサイル込み。追加料金なし。コインは死なずに終えたランだけが残ります — エンドレスではレアです。" }
       };
       function t(k) { return (STR[lang] && STR[lang][k]) || STR.en[k] || k; }
       function tf(k, map) { var s = t(k); for (var kk in map) s = s.split("{" + kk + "}").join(map[kk]); return s; }
@@ -1175,7 +1156,6 @@
         var set = function (id, txt) { var e = document.getElementById(id); if (e) e.textContent = txt; };
         set("looksBtn", t("looks")); set("shareBtnMenu", t("share"));
         set("shareBtnResults", t("share")); set("shareBtnOver", t("share"));
-        set("demoCapMenuBtn", t("backMenu")); set("demoCapShareBtn", t("share"));
         set("nextBtn", t("nextMap")); set("replayBtn", t("replay")); set("againBtn", t("again"));
         set("overMenuBtn", t("outMenu")); set("retryBtn", t("retryStart")); set("failMapBtn", t("backToMap"));
         set("outEndlessBtn", t("outEndless")); set("outMapBtn", t("backToMap")); set("outMenuBtn", t("outMenu"));
@@ -1375,6 +1355,7 @@
       function pokePortrait() {
         // the CARD mascot keeps his little flinch + urgh
         ensureAudio(); sndUrgh();
+        eggTap();
         portraitFlinch = 1;
         drawMascotPortrait(document.getElementById("cardMascotCvs"), portraitHood(), 1);
         if (portraitFlinchTimer) clearTimeout(portraitFlinchTimer);
@@ -1394,6 +1375,7 @@
       }
       function pressMenuMascot() {
         ensureAudio();
+        eggTap();
         if (menuSquishAnim) { cancelAnimationFrame(menuSquishAnim); menuSquishAnim = null; }
         menuSquishHeld = true;
         menuSquish = 1;
@@ -1417,6 +1399,66 @@
           else menuSquishAnim = null;
         }
         menuSquishAnim = requestAnimationFrame(frame);
+      }
+
+      /* ---------------- easter egg: poke him 30x, get 100 coins ----------------
+         A secret, once a day. Every poke of the card/menu mascot counts
+         toward 30 — the squish/flinch IS the feedback; there is NO
+         visible counter, or it wouldn't be a secret. The count lives
+         on the device (localStorage), keyed by the SAME day as the
+         Daily Challenge: a new day zeroes the count and re-arms the
+         prize. The 30th poke of the day bursts coins over the mascot,
+         floats a "+100" and lands 100 coins in the normal wallet.
+         The once-a-day lock keeps the scarce coin economy safe:
+         nobody farms the prestige skin by poking. If storage is
+         unavailable the pokes just stay pokes — nothing breaks. */
+      var EGG_KEY = "wuEggV1", EGG_TAPS = 30, EGG_PRIZE = 100;
+      function eggLoad() {
+        var today = todayKey(), d = { day: today, taps: 0, claimed: false };
+        try {
+          var raw = window.localStorage.getItem(EGG_KEY);
+          if (raw) {
+            var p = JSON.parse(raw);
+            if (p && p.day === today) { d.taps = p.taps | 0; d.claimed = !!p.claimed; }
+          }
+        } catch (e) {}
+        return d;
+      }
+      function eggSave(d) {
+        try { window.localStorage.setItem(EGG_KEY, JSON.stringify(d)); } catch (e) {}
+      }
+      function eggTap() {
+        var d = eggLoad();
+        if (d.claimed) return; // already paid today — a poke is just a poke
+        d.taps++;
+        if (d.taps >= EGG_TAPS) {
+          d.taps = 0; d.claimed = true; eggSave(d);
+          totalCoins += EGG_PRIZE;
+          updateHud(); refreshWallet();
+          eggCelebrate();
+        } else eggSave(d);
+      }
+      function eggCelebrate() {
+        sndCoin(); setTimeout(sndCoin, 95); sndCeleb();
+        var btn = document.getElementById(state === "onboard" ? "cardMascotBtn" : "menuMascotBtn");
+        if (!btn) return;
+        if (!reducedMotion) {
+          for (var i = 0; i < 9; i++) {
+            var c = document.createElement("span");
+            c.className = "eggCoin"; c.textContent = "\u{1FA99}";
+            var ang = (i / 9) * Math.PI * 2 + Math.random() * 0.5;
+            var dist = 55 + Math.random() * 45;
+            c.style.setProperty("--dx", Math.cos(ang) * dist + "px");
+            c.style.setProperty("--dy", (Math.sin(ang) * dist - 24) + "px");
+            c.style.setProperty("--rot", (Math.random() * 260 - 130) + "deg");
+            btn.appendChild(c);
+            (function (el) { setTimeout(function () { el.remove(); }, 900); })(c);
+          }
+        }
+        var p = document.createElement("span");
+        p.className = "eggPlus"; p.textContent = "+" + EGG_PRIZE + " \u{1FA99}";
+        btn.appendChild(p);
+        setTimeout(function () { p.remove(); }, 1100);
       }
 
       /* ---------------- session players & personal bests ----------------
@@ -1512,9 +1554,6 @@
       var runCoins = 0;
       var hitsThisRun = 0;       // any hit (incl. shield breaks) — kills the 3rd star
 
-      /* DEMO EDITION locks: the Journey opens levels 1–3 only, and
-         Endless / Daily runs end at gate 40 on the teaser screen. */
-      var DEMO_LEVEL_CAP = 3, DEMO_GATE_CAP = 40;
       function setState(s) {
         state = s;
         document.body.setAttribute("data-state", s);
@@ -1894,15 +1933,15 @@
          stays priceless: achievement only. */
       var SKINS = [
         { id: "classic", name: "Classic", swatch: "#232327", hoodie: "#232327", face: "classic", shades: false, accessory: "none", cost: 0, unlockLevel: 0 },
-        { id: "red", name: "Red + Cap 🧢", swatch: "#b3352c", hoodie: "#b3352c", face: "classic", shades: false, accessory: "cap", cost: 300, unlockLevel: 2 },
-        { id: "sky", name: "Blue + Phones 🎧", swatch: "#2f6db3", hoodie: "#2f6db3", face: "classic", shades: false, accessory: "phones", cost: 600, unlockLevel: 4 },
-        { id: "star", name: "Purple + Antenna ⭐", swatch: "#a884c4", hoodie: "#5b3a8c", face: "classic", shades: false, accessory: "antenna", cost: 800, unlockLevel: 5 },
-        { id: "sleepy", name: "Sleepy + Nightcap 🌙", swatch: "#fffef7", hoodie: "#232327", face: "sleepy", shades: false, accessory: "nightcap", cost: 500, unlockLevel: 6 },
-        { id: "guitar", name: "Pink + Electric Guitar 🎸", swatch: "#e86aa8", hoodie: "#e86aa8", face: "classic", shades: false, accessory: "guitar", cost: 800, unlockLevel: 8 },
-        { id: "green", name: "Green + Bandana 🟢", swatch: "#2e7d4f", hoodie: "#2e7d4f", face: "classic", shades: false, accessory: "bandana", cost: 700, unlockLevel: 10 },
-        { id: "shades", name: "Cool Shades 🕶️", swatch: "#141416", hoodie: "#232327", face: "classic", shades: true, accessory: "none", cost: 900, unlockLevel: 12 },
-        { id: "gold", name: "Gold + Crown 👑", swatch: "#d9a81f", hoodie: "#d9a81f", face: "classic", shades: false, accessory: "crown", cost: 1200, unlockLevel: 14 },
-        { id: "stormcar", name: "Storm-Chaser Car 🌪️", swatch: "#ff7a1a", hoodie: "#4a4f57", face: "classic", shades: false, accessory: "stormcar", cost: 3000, unlockLevel: 15 },
+        { id: "red", name: "Red + Cap 🧢", swatch: "#b3352c", hoodie: "#b3352c", face: "classic", shades: false, accessory: "cap", cost: 200, unlockLevel: 2 },
+        { id: "sky", name: "Blue + Phones 🎧", swatch: "#2f6db3", hoodie: "#2f6db3", face: "classic", shades: false, accessory: "phones", cost: 289, unlockLevel: 4 },
+        { id: "star", name: "Purple + Antenna ⭐", swatch: "#a884c4", hoodie: "#5b3a8c", face: "classic", shades: false, accessory: "antenna", cost: 348, unlockLevel: 5 },
+        { id: "sleepy", name: "Sleepy + Nightcap 🌙", swatch: "#fffef7", hoodie: "#232327", face: "sleepy", shades: false, accessory: "nightcap", cost: 259, unlockLevel: 6 },
+        { id: "guitar", name: "Pink + Electric Guitar 🎸", swatch: "#e86aa8", hoodie: "#e86aa8", face: "classic", shades: false, accessory: "guitar", cost: 348, unlockLevel: 8 },
+        { id: "green", name: "Green + Bandana 🟢", swatch: "#2e7d4f", hoodie: "#2e7d4f", face: "classic", shades: false, accessory: "bandana", cost: 319, unlockLevel: 10 },
+        { id: "shades", name: "Cool Shades 🕶️", swatch: "#141416", hoodie: "#232327", face: "classic", shades: true, accessory: "none", cost: 378, unlockLevel: 12 },
+        { id: "gold", name: "Gold + Crown 👑", swatch: "#d9a81f", hoodie: "#d9a81f", face: "classic", shades: false, accessory: "crown", cost: 467, unlockLevel: 14 },
+        { id: "stormcar", name: "Storm-Chaser Car 🌪️", swatch: "#ff7a1a", hoodie: "#4a4f57", face: "classic", shades: false, accessory: "stormcar", cost: 1000, unlockLevel: 15 },
         { id: "centurion", name: "Centurion 100 🏅", swatch: "#f2c230", hoodie: "#232327", face: "classic", shades: false, accessory: "medal100", cost: 0, unlockLevel: 0, endless100: true }
       ];
       /* the Centurion is the ONE skin with no shortcut: no coin
@@ -1967,17 +2006,15 @@
         var grid = document.getElementById("skinsGrid");
         if (!grid) return;
         grid.innerHTML = "";
-        /* DEMO: every skin is a locked display-only teaser —
-           padlock + price visible, nothing purchasable or
-           equippable. The starter hood-colour pick on the player
-           card stays the only appearance change. */
         SKINS.forEach(function (sk) {
+          var unlocked = !!unlockedSkins[sk.id];
           var btn = document.createElement("button");
           btn.type = "button";
-          btn.className = "skinBtn locked";
-          var label = "🔒 " + sk.name;
-          if (sk.endless100) label += t("centurionTag");
-          else if (sk.cost > 0) label += " · 🪙 " + sk.cost;
+          btn.className = "skinBtn" + (currentSkin.id === sk.id ? " selected" : "") + (unlocked ? "" : " locked");
+          var label = sk.name;
+          if (sk.endless100 && !unlocked) label += t("centurionTag");
+          else if (!unlocked) label += tf("skinLockedTag", { l: sk.unlockLevel, c: sk.cost });
+          else if (currentSkin.id === sk.id) label += t("skinOnTag");
           btn.innerHTML = '<span class="swatch" style="background:' + sk.swatch + '"></span>' + label;
           btn.addEventListener("click", function () { pickSkin(sk); });
           grid.appendChild(btn);
@@ -1985,16 +2022,34 @@
         refreshWallet();
       }
       function pickSkin(sk) {
-        // DEMO: skins are display-only — no buying, no equipping.
         var msg = document.getElementById("skinMsg");
-        msg.textContent = t("demoSkinMsg");
+        if (sk.endless100 && !unlockedSkins[sk.id]) {
+          msg.textContent = t("centurionNoMsg");
+          return;
+        }
+        if (unlockedSkins[sk.id]) {
+          currentSkin = sk; hoodOverride = null; if (currentPlayer) currentPlayer.hood = null;
+          msg.textContent = tf("skinOnMsg", { n: sk.name });
+        } else if (skinProgressMet(sk)) {
+          unlockedSkins[sk.id] = true; currentSkin = sk;
+          msg.textContent = tf("skinFreeMsg", { l: sk.unlockLevel, n: sk.name });
+        } else if (totalCoins >= sk.cost) {
+          totalCoins -= sk.cost;
+          unlockedSkins[sk.id] = true; currentSkin = sk;
+          msg.textContent = tf("skinBoughtMsg", { c: sk.cost });
+        } else {
+          msg.textContent = tf("skinNeedMsg", { l: sk.unlockLevel, c: sk.cost, h: totalCoins });
+          refreshSkins(); return;
+        }
+        refreshSkins(); updateHud();
       }
       // called when a level is completed: unlocks that level's skin
       function checkSkinUnlocks(forLevel) {
-        // DEMO: completing a level unlocks no skin here — the whole
-        // wardrobe opens in the full version, so the results screen
-        // never promises a look the demo won't hand over.
-        return [];
+        var got = [];
+        SKINS.forEach(function (sk) {
+          if (sk.unlockLevel === forLevel && !unlockedSkins[sk.id]) { unlockedSkins[sk.id] = true; got.push(sk.name); }
+        });
+        return got;
       }
 
       var levelStars = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]; // session only
@@ -5138,7 +5193,6 @@
             }
             updateHud();
             if (context === "endless") {
-              if (score >= DEMO_GATE_CAP) { demoCapEnd(); return; }
               if (score === 100) unlockCenturion(true);
               var ns = stageForScore(score);
               if (ns > curStage) onStageUp(ns);
@@ -5503,7 +5557,6 @@
                   addParticle(bird.x + 40, bird.y - 52, "SMASHED! 🌶️", "#b3352c");
                   for (var db = 0; db < 5; db++) addParticle(q.x + 20 + db * 7, bird.y + (db - 2) * 13, "✦", "#5b5348");
                   updateHud();
-                  if (context === "endless" && score >= DEMO_GATE_CAP) { demoCapEnd(); return; }
                   if (context === "endless") { var nsm = stageForScore(score); if (nsm > curStage) onStageUp(nsm); }
                   else if (score >= gatesTotal && !finishMark) { finishMark = { x: bird.x + prm.spacing * 1.15 }; showBanner(t("finishLine"), t("finishSub"), 1500); }
                   break;
@@ -5904,25 +5957,6 @@
         setState("failed");
       }
 
-      /* DEMO CAP: gate 40 ends an Endless / Daily run on the spot.
-         The score still counts (personal records, coins kept —
-         Endless coins land in the wallet as they are collected),
-         then the teaser screen takes over. */
-      function demoCapEnd() {
-        var isDaily = scoreMode === "daily";
-        var isRecord = score > (isDaily ? bestDaily : bestEndless);
-        recordScore(scoreMode, score);
-        document.getElementById("demoCapMode").textContent = isDaily ? t("dailyChallenge") + " — " + todayLabel() : t("endlessMode");
-        document.getElementById("demoCapFinal").textContent = score;
-        document.getElementById("demoCapRecord").className = isRecord && score > 0 ? "show" : "";
-        document.getElementById("demoCapLine").textContent = (playerName ? playerName + " · " : "") +
-          tf("demoCapScore", { n: score }) + tf("demoCapCoins", { c: runCoins });
-        drawMascotPortrait(document.getElementById("demoCapMascot"), portraitHood(), 0);
-        refreshScoreLabels();
-        sndCeleb();
-        setState("democap");
-      }
-
       var celebT = 0, celebPrevCyc = 0, celebX = 0, arrivalKind = "journey";
       function startArrival(kind) {
         arrivalKind = kind;
@@ -6281,10 +6315,10 @@
         [72, 57], [54, 58], [34, 60], [14, 51], [30, 40],
         [50, 38], [70, 36.5], [85, 25.5], [68, 13.5], [50, 11]
       ];
-      function levelUnlocked(n) { return n <= DEMO_LEVEL_CAP && (n === 1 || levelStars[n - 2] > 0); }
+      function levelUnlocked(n) { return n === 1 || levelStars[n - 2] > 0; }
       function currentJourneyLevel() {
         for (var i = 1; i <= 15; i++) if (levelStars[i - 1] === 0 && levelUnlocked(i)) return i;
-        return DEMO_LEVEL_CAP;
+        return 15;
       }
       function refreshMap() {
         var area = document.getElementById("mapArea");
@@ -6312,7 +6346,6 @@
             btn.addEventListener("click", function () {
               if (!requireProfile()) return;
               var msg = document.getElementById("mapMsg");
-              if (n > DEMO_LEVEL_CAP) { msg.textContent = t("demoLockedLevel"); return; }
               if (!levelUnlocked(n)) { msg.textContent = "Finish level " + (n - 1) + " to unlock this one."; return; }
               if (hearts <= 0) { msg.textContent = "Out of lives — the next heart lands soon (1 per minute)."; return; }
               msg.textContent = "";
@@ -6756,8 +6789,6 @@
       document.getElementById("failMapBtn").addEventListener("click", function () { showMap(); });
       document.getElementById("againBtn").addEventListener("click", function () { ensureAudio(); startEndless(scoreMode); });
       document.getElementById("overMenuBtn").addEventListener("click", function () { showMenu(); });
-      document.getElementById("demoCapMenuBtn").addEventListener("click", function () { showMenu(); });
-      document.getElementById("demoCapShareBtn").addEventListener("click", function () { shareGame(this); });
       document.getElementById("outEndlessBtn").addEventListener("click", function () { if (!requireProfile()) return; ensureAudio(); startEndless(); });
       document.getElementById("outMapBtn").addEventListener("click", function () { showMap(); });
       document.getElementById("outMenuBtn").addEventListener("click", function () { showMenu(); });
