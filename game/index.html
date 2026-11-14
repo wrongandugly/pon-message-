@@ -6,6 +6,13 @@
     <meta name="color-scheme" content="light" />
     <link rel="icon" href="data:," />
     <title>Wrong and Ugly — Journey</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Wrong and Ugly" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Patrick+Hand&display=swap" rel="stylesheet" />
@@ -6766,6 +6773,16 @@
       applyLanguage();
       setState("onboard"); // first visit: nickname + age band, then the menu
       requestAnimationFrame(loop);
+    </script>
+    <script>
+      /* PWA: registra o service worker (instalação + offline).
+         Só em http/https e sempre protegido — arquivo local ou
+         navegador sem suporte segue o jogo normalmente. */
+      if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+        try {
+          navigator.serviceWorker.register("sw.js").catch(function () {});
+        } catch (e) {}
+      }
     </script>
   </body>
 </html>
