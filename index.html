@@ -824,7 +824,7 @@
 var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
 var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
 var PUSH_FN_URL = SB_URL + '/functions/v1/send-push';
-var APP_VERSION = '1.4.1';   /* exibida nas Configurações */
+var APP_VERSION = '1.4.2';   /* exibida nas Configurações */
 /* chave pública VAPID de mentira, só pro adaptador fake (a de verdade
    nasce dentro da Edge Function e nunca aparece em arquivo) */
 var FAKE_VAPID = 'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks';
@@ -1662,7 +1662,7 @@ function onEvent(roomId, type, p){
      ficava refém do heartbeat curar a presença: a linha chegava, mas o
      balão só aparecia até 20s depois (o "delay") ou nem aparecia (a
      poltrona virava jaqueta). É o mesmo princípio do evento 'hb'. */
-  if (type !== 'hb'){
+  if (type !== 'hb' && type !== 'bye'){
     var dPrev = personDisplay(roomId, p.from);
     (S.lastHb[roomId] = S.lastHb[roomId] || {})[p.from] = {
       at: Date.now(), estado: dPrev.estado !== 'offline' ? dPrev.estado : 'online'
@@ -1690,6 +1690,13 @@ function onEvent(roomId, type, p){
       shakeChar(me.token);
       toast('👋', '<b>' + esc(p.name || 'Alguém') + '</b> chamou sua atenção');
     }
+  } else if (type === 'bye'){
+    /* saída anunciada (v1.4.2): apaga o carimbo de vida e o mapa de
+       presença — a pessoa consta FORA na hora, sem esperar o próximo
+       sync nem o heartbeat esfriar (60–90s). As poltronas e o status
+       da porta atualizam no render ao fim deste onEvent. */
+    if (S.lastHb[roomId]) delete S.lastHb[roomId][p.from];
+    if (S.presence[roomId]) delete S.presence[roomId][p.from];
   } else if (type === 'hb'){
     /* heartbeat de presença (a cada ~20s de quem está na sala):
        carimba a última vez que a pessoa foi vista DE VERDADE */
@@ -1792,14 +1799,27 @@ var HB_MS = 20000;
 function heartbeatNow(){
   var roomId = S.currentRoom; if (!roomId) return;
   if (me.estado === 'invisible') return;
+  if (document.visibilityState === 'hidden') return;   /* escondido = fora: o 'bye' já avisou; não re-anuncia */
   trackMe(roomId);
   (S.lastHb[roomId] = S.lastHb[roomId] || {})[me.token] = { at: Date.now(), estado: me.estado };
   DB.broadcast(roomId, 'hb', { from: me.token, ts: Date.now(), estado: me.estado });
 }
+/* ---- sinal de saída rápido (v1.4.2) ----
+   Ao esconder ou fechar a página, anuncia 'bye' e desanuncia a
+   presença: quem está na sala me vê FORA em segundos, sem esperar o
+   mapa de presença/heartbeat esfriar (60–90s). Ao voltar pra aba/app,
+   o heartbeatNow re-anuncia (trackMe) — o vai-e-vem continua são. */
+function sayBye(){
+  var roomId = S.currentRoom; if (!roomId) return;
+  try { DB.broadcast(roomId, 'bye', { from: me.token }); } catch(e){}
+  DB.untrack(roomId, me.token);
+}
 setInterval(heartbeatNow, HB_MS);
 document.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'visible') heartbeatNow();
+  else sayBye();
 });
+window.addEventListener('pagehide', sayBye);
 window.addEventListener('focus', heartbeatNow);
 window.addEventListener('pageshow', heartbeatNow);
 
@@ -1930,7 +1950,7 @@ function enterRoom(roomId){
   el('viewRoom').style.display = '';
   el('roomName').textContent = (room.emoji || '🚪') + ' ' + room.name;
   trackMe(roomId);
-  refreshMembers(roomId);
+  refreshMembers(roomId).then(function(){ notifyEnter(roomId); });
   refreshPins(roomId);
   refreshPhotos(roomId);
   renderRoom();
@@ -2558,10 +2578,17 @@ function maybePushPrompt(roomId){
     openPushSheet();
   }).catch(function(){});
 }
-/* dispara o push SÓ pra quem é da sala e NÃO está presente agora.
-   kind: 'say' | 'signal' | 'nudge'. onlyToken restringe (sinal/cutucada
-   são pra uma pessoa só). Nunca quebra o envio normal: catch em tudo. */
-function notifyAbsent(roomId, kind, extra, onlyToken){
+/* dispara o push pra TODOS os outros membros da sala — SEM filtrar
+   por presença (v1.4.2: a trava mudou de lado). Quem decide MOSTRAR é
+   o aparelho de quem recebe: o sw.js suprime o banner se o app estiver
+   aberto e visível; em segundo plano/fechado, o banner sai NA HORA.
+   Antes, o remetente adivinhava quem estava fora pelo mapa de
+   presença — mas a presença leva até ~90s pra esfriar depois que a
+   pessoa sai, e a cutucada nesse intervalo caía num buraco (sem push,
+   sem sala). kind: 'say' | 'signal' | 'nudge' | 'enter'. onlyToken
+   restringe (sinal/cutucada são pra uma pessoa só). Nunca quebra o
+   envio normal: catch em tudo. */
+function notifyRoom(roomId, kind, extra, onlyToken){
   try {
     var members = S.members[roomId] || [];
     var targets = [];
@@ -2569,7 +2596,6 @@ function notifyAbsent(roomId, kind, extra, onlyToken){
       var t = m.device_token;
       if (!t || t === me.token) return;
       if (onlyToken && t !== onlyToken) return;
-      if (isPresent(roomId, t)) return;   /* está na sala (até invisível): vê ao vivo */
       targets.push(t);
     });
     if (!targets.length) return;
@@ -2582,6 +2608,22 @@ function notifyAbsent(roomId, kind, extra, onlyToken){
     if (extra) for (var k in extra) payload[k] = extra[k];
     var p = DB.pushNotify(payload);
     if (p && p.catch) p.catch(function(){});
+  } catch(e){}
+}
+/* push de ENTRADA na sala, com trava anti-sino: no máximo 1× por sala
+   a cada 15 min — reabrir o app toda hora não vira sino. O carimbo
+   mora no localStorage DESTE aparelho e só é gravado quando o aviso
+   realmente sai (sala com mais alguém). */
+var ENTER_PUSH_MS = 15 * 60 * 1000;
+function notifyEnter(roomId){
+  try {
+    var others = (S.members[roomId] || []).some(function(m){ return m.device_token && m.device_token !== me.token; });
+    if (!others) return;
+    var key = 'pon-enter-push:' + roomId, last = 0;
+    try { last = +(localStorage.getItem(key) || 0); } catch(e){}
+    if (Date.now() - last < ENTER_PUSH_MS) return;
+    try { localStorage.setItem(key, String(Date.now())); } catch(e){}
+    notifyRoom(roomId, 'enter', {});
   } catch(e){}
 }
 
@@ -2609,7 +2651,7 @@ function say(text){
   pushSpeech(roomId, me.token, text, true);
   S.lastTalkAt[roomId] = Date.now();
   DB.broadcast(roomId, 'say', { from: me.token, name: me.name, text: text });
-  notifyAbsent(roomId, 'say', { text: text.slice(0, 60) });
+  notifyRoom(roomId, 'say', { text: text.slice(0, 60) });
   SoundFX.play('popme');
   el('talkInput').value = '';
   renderRoom();
@@ -2628,7 +2670,7 @@ function sendWhisper(roomId, token, text){
 function sendSignal(roomId, token, emoji){
   (S.bursts[roomId] = S.bursts[roomId] || {})[token] = { emoji: emoji, until: Date.now() + 1500 };
   DB.broadcast(roomId, 'signal', { from: me.token, to: token, emoji: emoji });
-  notifyAbsent(roomId, 'signal', { emoji: emoji }, token);
+  notifyRoom(roomId, 'signal', { emoji: emoji }, token);
   SoundFX.signal(emoji);   /* quem envia também ouve o som do sinal */
   closeSheet();
   renderRoom();
@@ -2637,7 +2679,7 @@ function sendSignal(roomId, token, emoji){
 }
 function sendNudge(roomId, token){
   DB.broadcast(roomId, 'nudge', { from: me.token, to: token, name: me.name });
-  notifyAbsent(roomId, 'nudge', {}, token);
+  notifyRoom(roomId, 'nudge', {}, token);
   shakeChar(token);
   closeSheet();
   focusOn(token);
@@ -3173,7 +3215,7 @@ function boot(){
                  renameRoom: renameRoom, setRoomPhotoFromDataUrl: setRoomPhotoFromDataUrl,
                  heartbeat: heartbeatNow, isPresent: isPresent,
                  push: { supported: pushSupported, enable: enablePush, disable: disablePush,
-                         subscription: pushSubscription, notifyAbsent: notifyAbsent, updateBtn: updatePushBtn },
+                         subscription: pushSubscription, notifyRoom: notifyRoom, updateBtn: updatePushBtn },
                  sound: SoundFX,
                  renderRoom: renderRoom, renderCanto: renderCanto, personDisplay: personDisplay };
   return DB.listMyRooms(me.token).then(function(data){
