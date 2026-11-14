@@ -251,6 +251,7 @@
   }
   .room{
     position:relative; height:392px; border-radius:20px; overflow:hidden;
+    container-type:inline-size;   /* palco = contêiner: 1cqw = 1% da largura da sala (faixas dos balões, v1.4.7) */
     box-shadow:0 6px 20px rgba(30,80,130,.13), inset 0 0 0 2px #d9b98c;
     background:linear-gradient(#f3e2c2 0%, #f3e2c2 58%, #d9a066 58.2%, #c98d54 100%);
   }
@@ -264,10 +265,6 @@
   .baseboard{
     position:absolute; left:0; right:0; top:calc(58% - 5px); height:6px; pointer-events:none;
     background:linear-gradient(#caa066,#a5713f); box-shadow:0 1px 2px rgba(90,50,20,.3);
-  }
-  .gshadow{
-    position:absolute; height:11px; border-radius:50%; pointer-events:none;
-    background:radial-gradient(ellipse at center, rgba(96,54,20,.34), rgba(96,54,20,0) 70%);
   }
   .char-shadow{
     position:absolute; left:50%; bottom:-2px; transform:translateX(-50%);
@@ -341,17 +338,6 @@
   .cb-sticky:nth-child(2n){ transform:rotate(2deg); background:#ffd9ec; color:#6e2447; }
   .cb-sticky:nth-child(3n){ background:#cfeecb; color:#265c1f; }
   .corkboard .cb-empty{ font-size:9px; color:#5f3c1c; text-align:center; margin-top:5px; font-style:italic; }
-  .rug{
-    position:absolute; left:50%; bottom:52px; transform:translateX(-50%); z-index:1;
-    width:190px; height:46px; border-radius:50%;
-    background:radial-gradient(ellipse at center,#e88ca0 0%,#d96b84 62%,#c95572 100%); opacity:.8;
-  }
-  .coffee{
-    position:absolute; left:50%; top:57%; transform:translate(-50%,-100%);
-    text-align:center; pointer-events:none; z-index:4; line-height:0;
-  }
-  .coffee .steam{ display:block; font-size:11px; color:rgba(255,255,255,.85); line-height:1; animation:steamUp 2.4s ease-in-out infinite; height:12px; }
-  @keyframes steamUp{ 0%,100%{ transform:translateY(2px); opacity:.35; } 50%{ transform:translateY(-3px); opacity:.9; } }
   .ghost-note{
     position:absolute; left:10px; top:10px; z-index:30;
     background:rgba(22,50,74,.82); color:#fff; font-size:12px; font-weight:600;
@@ -373,7 +359,7 @@
   .bal-col{ display:flex; flex-direction:column; align-items:center; will-change:transform; }
   .balloon{
     position:relative; background:#fff; border-radius:13px; padding:6px 9px 5px;
-    font-size:12.5px; line-height:1.3; color:var(--ink); max-width:150px;
+    font-size:12.5px; line-height:1.3; color:var(--ink); max-width:150px; max-width:min(150px,31cqw);   /* ≤31% do palco: cabe na sua faixa de coluna (v1.4.7) */
     box-shadow:0 3px 10px rgba(30,80,130,.18); margin-bottom:5px; z-index:5; text-align:left;
   }
   .balloon::after{
@@ -386,7 +372,7 @@
   .whisper-bal{
     position:relative; background:rgba(255,255,255,.85); border:1.5px dashed #8fb8dd;
     border-radius:11px; padding:4px 8px 3px; font-size:11.5px; line-height:1.25; color:#33536f;
-    max-width:132px; margin-bottom:4px; z-index:5; box-shadow:0 2px 6px rgba(30,80,130,.12); text-align:left;
+    max-width:132px; max-width:min(132px,31cqw); margin-bottom:4px; z-index:5; box-shadow:0 2px 6px rgba(30,80,130,.12); text-align:left;
   }
   .whisper-bal.mine{ border-color:#d8a04a; background:rgba(255,246,232,.92); color:#7a5410; }
   .whisper-bal .cd{ display:block; font-size:9px; font-weight:700; color:#7d97ac; margin-top:1px; }
@@ -747,9 +733,6 @@
         <div class="plant-prop">🪴</div>
         <div class="floor"></div>
         <div class="baseboard"></div>
-        <div class="gshadow" style="left:50%;bottom:44px;width:190px;transform:translateX(-50%)"></div>
-        <div class="rug"></div>
-        <div class="coffee" id="coffeeMachine"></div>
         <div id="roomChars"></div>
         <div class="ghost-note" id="ghostNote">👻 você está invisível — espiando pela janela</div>
       </div>
@@ -861,7 +844,7 @@
 var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
 var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
 var PUSH_FN_URL = SB_URL + '/functions/v1/send-push';
-var APP_VERSION = '1.4.6';   /* exibida nas Configurações */
+var APP_VERSION = '1.4.7';   /* exibida nas Configurações */
 /* chave pública VAPID de mentira, só pro adaptador fake (a de verdade
    nasce dentro da Edge Function e nunca aparece em arquivo) */
 var FAKE_VAPID = 'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks';
@@ -880,28 +863,35 @@ var PRES_META = {
   invisible:{ dot:'invisible',label:'Invisível' },
   offline:  { dot:'offline',  label:'Fora da sala' }
 };
-/* ============ MESA DE PÔQUER (v1.4.5; anel v1.4.6) ============
-   Fim do arrasto: as poltronas moram em 6 ÂNCORAS ao redor da
-   mesinha central. O assento é estado compartilhado
-   (members.seat); sem seat salvo, a atribuição é determinística
-   e centro-pra-fora. Todo cliente calcula o MESMO mapa dos
-   MESMOS dados.
-   ANEL (v1.4.6): a v1.4.5 desenhava um arco raso no rodapé com
-   14–15% entre as centrais — menos que a largura real da poltrona
-   (.char = 84px ≈ 22% do palco): as do meio nasciam sobrepostas
-   e as plaquinhas colidiam (print real do Fabricio). Agora é um
-   anel de verdade: 2 FLANCOS na altura da mesa (0 = esquerda,
-   5 = direita), 2 CENTRAIS embaixo (2,3) e 2 CANTOS (1,4).
-   Preferência 2,3,0,5,1,4: o casal cai no par central; o 3º e
-   o 4º vão pros flancos da mesa; o 5º e o 6º, pros cantos.
-   Geometria PROVADA em pixels na suíte (test-v146): o retângulo
-   de cada poltrona (84 × ~112px: plaquinha + poltrona + cabeça,
-   medidos do CSS) não intersecta o de nenhuma outra, em
-   qualquer ocupação de 1 a 6, em palcos de 360 a 480px. */
+/* ============ GRADE 3×2 SEM MESA (v1.4.7) ============
+   O assento é estado compartilhado (members.seat); sem seat
+   salvo, a atribuição é determinística e todo cliente calcula
+   o MESMO mapa dos MESMOS dados (computeSeatMap).
+   A mesa de pôquer (v1.4.5) e o anel ao redor dela (v1.4.6)
+   morreram: a frase do Fabricio que manda é "o objetivo final
+   é as mensagens serem lidas com clareza" — clareza > tema.
+   O desenho inverteu: primeiro as FAIXAS dos balões, as
+   poltronas embaixo delas. A mesinha/cafeteira e o tapete
+   saíram do render: o meio da sala virou ar pros balões.
+   - GRADE: 3 colunas (x 16,5 / 50 / 83,5) × 2 fileiras
+     (y 96 embaixo, 65 em cima). Cada coluna é uma faixa
+     EXCLUSIVA de balão: a faixa tem 33,5% do palco e o balão
+     tem max-width de 31% (min(150px, 31cqw)) — vizinho de
+     coluna não encosta no seu, e a fileira de baixo não
+     alcança a zona de balão da de cima (prova em pixels na
+     suíte test-v147, seção P7: poltrona×poltrona,
+     plaquinha×plaquinha e BALÃO×BALÃO, zero interseção).
+   - PREFERÊNCIA: a fileira de baixo enche primeiro, do
+     centro pras pontas (0,1,2), depois a de cima (3,4,5):
+     casal e trio lado a lado no "sofá" de baixo.
+   - As colunas ficam a 16,5% das bordas (e não 17%) por
+     causa da plaquinha "· fora" de 11 letras a 360px: é o
+     ajuste fino que a prova de plaquinhas mandou. */
 var SEAT_ANCHORS = [
-  {x:14,y:58},{x:12.5,y:88},{x:36.5,y:95},{x:63.5,y:95},{x:87.5,y:88},{x:86,y:58}
+  {x:50,y:96},{x:16.5,y:96},{x:83.5,y:96},
+  {x:50,y:65},{x:16.5,y:65},{x:83.5,y:65}
 ];
-var SEAT_PREF = [2, 3, 0, 5, 1, 4];
+var SEAT_PREF = [0, 1, 2, 3, 4, 5];
 
 /* ---------------- utilidades ---------------- */
 function el(id){ return document.getElementById(id); }
@@ -1002,20 +992,6 @@ function chairSVG(cushion){
     + '<rect x="13" y="38" width="50" height="13" rx="6" fill="'+cushion+'"/>'
     + '<rect x="18" y="53" width="6" height="10" fill="#7a3b26"/>'
     + '<rect x="52" y="53" width="6" height="10" fill="#7a3b26"/>'
-    + '</svg>';
-}
-function coffeeSVG(){
-  return '<span class="steam">~ ~</span>'
-    + '<svg width="88" height="66" viewBox="0 0 88 66" aria-hidden="true">'
-    + '<rect x="15" y="50" width="58" height="5" rx="2.5" fill="#8a5a33"/>'
-    + '<rect x="20" y="55" width="5" height="8" fill="#6e4525"/><rect x="63" y="55" width="5" height="8" fill="#6e4525"/>'
-    + '<rect x="19" y="10" width="50" height="33" rx="7" fill="#3a3f44"/>'
-    + '<rect x="25" y="16" width="38" height="10" rx="3" fill="#22262a"/>'
-    + '<circle cx="31" cy="21" r="2.4" fill="#e5484d"/><circle cx="39" cy="21" r="2.4" fill="#43c72e"/>'
-    + '<rect x="39" y="29" width="10" height="6" rx="2" fill="#9aa2a8"/>'
-    + '<rect x="36" y="36" width="16" height="10" rx="2.5" fill="#ffffff"/>'
-    + '<path d="M52 39 q6 3 0 6" stroke="#ffffff" stroke-width="2.4" fill="none"/>'
-    + '<rect x="27" y="47" width="34" height="3.5" rx="1.8" fill="#22262a"/>'
     + '</svg>';
 }
 function propFor(estado){
@@ -1959,11 +1935,17 @@ function seatAnchorOf(roomId, token){
 function seatPos(roomId, token){
   return SEAT_ANCHORS[seatAnchorOf(roomId, token)];
 }
-/* o LEQUE dos balões: a âncora inclina o balão pra fora do centro
-   (esquerda puxa pra esquerda, direita pra direita, centro reto) */
+/* o LEQUE dos balões (v1.4.7): agora é POR COLUNA e quase
+   reto — o leque aberto das v1.4.5/6 varria o balão pra fora
+   da faixa da coluna (a faixa tem 33,5% e o balão, 31%: não
+   sobra pra inclinar). Sobrou um empurrão de ±2px pra fora,
+   SEM rotação (rotação varre os cantos pra fora da faixa).
+   Contido na faixa em qualquer palco ≥360px — prova na
+   seção P7 da suíte (o retângulo do balão inclui o fx). */
 function fanOf(anchor){
-  var lean = anchor - (SEAT_ANCHORS.length - 1) / 2;   /* -2.5 .. +2.5 */
-  return { fx: Math.round(lean * 6), fr: Math.round(lean * 14) / 10 };
+  var pos = SEAT_ANCHORS[anchor] || SEAT_ANCHORS[0];
+  var lean = pos.x < 33.5 ? -1 : (pos.x > 66.5 ? 1 : 0);
+  return { fx: lean * 2, fr: 0 };
 }
 function inviteLink(room){
   return location.origin + location.pathname + '#c/' + room.invite_code;
@@ -2595,11 +2577,19 @@ function renderCorkboard(){
   h += '</div><div class="cb-open">toca pra abrir ›</div>';
   el('corkboard').innerHTML = h;
 }
-function balloonDims(lines){
+function balloonDims(lines, W){
+  /* a largura do modelo acompanha a faixa da coluna (v1.4.7):
+     o teto é o MESMO do CSS — min(150px, 31% do palco). Sem
+     isso, a caixa do layoutBalloons seria mais larga que o
+     balão real e a elevação anti-sobreposição dispararia à
+     toa entre colunas vizinhas. Os caracteres por linha
+     escalam com a largura efetiva (24 a 150px). */
+  var capW = Math.min(150, Math.floor((W || 400) * 0.31));
   var maxLen = 0;
   lines.forEach(function(l){ maxLen = Math.max(maxLen, l.text.length); });
-  var w = clamp(34 + maxLen * 6.4, 60, 150);
-  var linesWrapped = lines.reduce(function(acc, l){ return acc + Math.max(1, Math.ceil(l.text.length / 24)); }, 0);
+  var w = clamp(34 + maxLen * 6.4, 60, capW);
+  var cpl = Math.max(10, Math.round(24 * w / 150));
+  var linesWrapped = lines.reduce(function(acc, l){ return acc + Math.max(1, Math.ceil(l.text.length / cpl)); }, 0);
   var hgt = linesWrapped * 16 + lines.length * 4 + 22;
   return { w: w, h: hgt };
 }
@@ -2696,7 +2686,6 @@ function renderRoom(){
   el('roomChars').innerHTML = members.slice(0, MAX_SEATS).map(function(m){
     return charHtml(roomId, m.device_token, smap[m.device_token]);
   }).join('') + swapTargetsHtml(roomId, smap);
-  el('coffeeMachine').innerHTML = coffeeSVG();
   renderCorkboard();
   var others = members.filter(function(m){ return m.device_token !== me.token; });
   var anyoneElseIn = others.some(function(m){ return isPresent(roomId, m.device_token); });
@@ -2742,7 +2731,7 @@ function layoutBalloons(roomId, members){
     var pos = seatPos(roomId, token);
     var sp = (S.speech[roomId] || {})[token];
     var lines = sp ? sp.lines.filter(function(l){ return l.exp > Date.now(); }) : [];
-    var dim = balloonDims(lines.length ? lines : [{ text: '' }]);
+    var dim = balloonDims(lines.length ? lines : [{ text: '' }], W);
     var cx = pos.x / 100 * W;
     var charTopY = pos.y / 100 * H - 118;
     var box = { l: cx - dim.w/2, r: cx + dim.w/2, t: charTopY - dim.h, b: charTopY };
