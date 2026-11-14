@@ -861,7 +861,7 @@
 var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
 var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
 var PUSH_FN_URL = SB_URL + '/functions/v1/send-push';
-var APP_VERSION = '1.4.5';   /* exibida nas Configurações */
+var APP_VERSION = '1.4.6';   /* exibida nas Configurações */
 /* chave pública VAPID de mentira, só pro adaptador fake (a de verdade
    nasce dentro da Edge Function e nunca aparece em arquivo) */
 var FAKE_VAPID = 'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks';
@@ -880,18 +880,28 @@ var PRES_META = {
   invisible:{ dot:'invisible',label:'Invisível' },
   offline:  { dot:'offline',  label:'Fora da sala' }
 };
-/* ============ MESA DE PÔQUER (v1.4.5) ============
-   Fim do arrasto: as poltronas moram em 6 ÂNCORAS desenhadas num
-   arco semicircular ao redor da mesinha (0 = ponta esquerda,
-   5 = ponta direita). O assento é estado compartilhado
+/* ============ MESA DE PÔQUER (v1.4.5; anel v1.4.6) ============
+   Fim do arrasto: as poltronas moram em 6 ÂNCORAS ao redor da
+   mesinha central. O assento é estado compartilhado
    (members.seat); sem seat salvo, a atribuição é determinística
-   e centro-pra-fora: preferência 2,3,1,4,0,5 — o casal cai nas
-   duas do meio, o trio fica centrado, a sala cheia usa o arco
-   todo. Todo cliente calcula o MESMO mapa dos MESMOS dados. */
+   e centro-pra-fora. Todo cliente calcula o MESMO mapa dos
+   MESMOS dados.
+   ANEL (v1.4.6): a v1.4.5 desenhava um arco raso no rodapé com
+   14–15% entre as centrais — menos que a largura real da poltrona
+   (.char = 84px ≈ 22% do palco): as do meio nasciam sobrepostas
+   e as plaquinhas colidiam (print real do Fabricio). Agora é um
+   anel de verdade: 2 FLANCOS na altura da mesa (0 = esquerda,
+   5 = direita), 2 CENTRAIS embaixo (2,3) e 2 CANTOS (1,4).
+   Preferência 2,3,0,5,1,4: o casal cai no par central; o 3º e
+   o 4º vão pros flancos da mesa; o 5º e o 6º, pros cantos.
+   Geometria PROVADA em pixels na suíte (test-v146): o retângulo
+   de cada poltrona (84 × ~112px: plaquinha + poltrona + cabeça,
+   medidos do CSS) não intersecta o de nenhuma outra, em
+   qualquer ocupação de 1 a 6, em palcos de 360 a 480px. */
 var SEAT_ANCHORS = [
-  {x:12,y:81},{x:28,y:90},{x:43,y:95},{x:57,y:95},{x:72,y:90},{x:88,y:81}
+  {x:14,y:58},{x:12.5,y:88},{x:36.5,y:95},{x:63.5,y:95},{x:87.5,y:88},{x:86,y:58}
 ];
-var SEAT_PREF = [2, 3, 1, 4, 0, 5];
+var SEAT_PREF = [2, 3, 0, 5, 1, 4];
 
 /* ---------------- utilidades ---------------- */
 function el(id){ return document.getElementById(id); }
