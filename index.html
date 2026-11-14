@@ -364,6 +364,12 @@
   }
   .whisper-bal.mine{ border-color:#d8a04a; background:rgba(255,246,232,.92); color:#7a5410; }
   .whisper-bal .cd{ display:block; font-size:9px; font-weight:700; color:#7d97ac; margin-top:1px; }
+  /* estado de entrega das MINHAS linhas (v1.4.3): a fala viaja pelo banco */
+  .balloon .lst, .whisper-bal .lst{ font-size:9.5px; font-weight:700; white-space:nowrap; }
+  .balloon .lst.ok, .whisper-bal .lst.ok{ color:#46a758; }
+  .balloon .lst.sending, .whisper-bal .lst.sending{ color:#b3852f; }
+  .balloon .lst.fail, .whisper-bal .lst.fail{ color:#d92d20; white-space:normal; }
+  .balloon .bline.fail, .whisper-bal[data-retry]{ cursor:pointer; }
   .seatwrap{ position:relative; width:80px; height:86px; line-height:0; }
   .seatwrap .chair-svg{ position:absolute; left:50%; bottom:0; transform:translateX(-50%); }
   .seatwrap .prop{ position:absolute; font-size:16px; z-index:3; line-height:1; }
@@ -818,13 +824,17 @@
    Cliente de arquivo único. Camada de dados atrás de um adaptador:
    - Real: Supabase (REST + Realtime Presence/Broadcast)
    - Fake: memória, usado nos testes (window.PON_FAKE = true)
-   Balões, sussurros, sinais e cutucadas vivem SÓ no Broadcast:
-   nunca são gravados no banco. Mural e fotos vão pro banco com
-   expires_at = agora + 24h. */
+   Sinais e cutucadas vivem SÓ no Broadcast (gestos do momento).
+   Fala e sussurro viajam pela tabela `talk` (v1.4.3): cada linha é
+   uma row com vida de 3 min — INSERT confirma a entrega (✓), o
+   Realtime (postgres_changes) é a via rápida e o catch-up por GET
+   (entrar/reconectar + sondagem de 5s) recolhe o que o socket
+   perdeu piscando. Nada é arquivado: a row morre junto do balão.
+   Mural e fotos vão pro banco com expires_at = agora + 24h. */
 var SB_URL = 'https://hxypeaofibruejbfhoop.supabase.co';
 var SB_KEY = 'sb_publishable_uREb1TncjK9sXNIEMhaVww_VjZ37mZz';
 var PUSH_FN_URL = SB_URL + '/functions/v1/send-push';
-var APP_VERSION = '1.4.2';   /* exibida nas Configurações */
+var APP_VERSION = '1.4.3';   /* exibida nas Configurações */
 /* chave pública VAPID de mentira, só pro adaptador fake (a de verdade
    nasce dentro da Edge Function e nunca aparece em arquivo) */
 var FAKE_VAPID = 'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks';
@@ -1153,7 +1163,8 @@ function createFakeAdapter(){
      permite a prova de DOIS clientes (duas janelas, um barramento).
      Sem barramento, comporta-se exatamente como antes (1 cliente). */
   var bus = window.PON_FAKE_BUS || (window.PON_FAKE_BUS = {});
-  if (!bus.store) bus.store = { rooms: [], members: [], pins: [], photos: [], uploads: [], sent: [], pushSubs: [], pushCalls: [] };
+  if (!bus.store) bus.store = { rooms: [], members: [], pins: [], photos: [], talk: [], uploads: [], sent: [], pushSubs: [], pushCalls: [] };
+  if (!bus.store.talk) bus.store.talk = [];
   if (!bus.presenceMap) bus.presenceMap = {};
   if (!bus.subs) bus.subs = {};        /* roomId -> { clientId: cbs } */
   if (!bus.clients) bus.clients = {}; /* clientId -> { token } */
@@ -1161,7 +1172,8 @@ function createFakeAdapter(){
   var store = bus.store;
   var presenceMap = bus.presenceMap; /* roomId -> [metas] */
   var clientId = 'cli' + Math.random().toString(36).slice(2, 9);
-  bus.clients[clientId] = { token: (typeof me !== 'undefined' && me && me.token) || clientId };
+  bus.clients[clientId] = { token: (typeof me !== 'undefined' && me && me.token) || clientId, talkDown: false };
+  var myCbs = {};   /* roomId -> cbs que ESTE cliente registrou */
   function rid(){ return 'fake-' + (bus.seq++); }
   function notifyPresence(roomId){
     var list = (presenceMap[roomId] || []).slice();
@@ -1169,6 +1181,18 @@ function createFakeAdapter(){
     Object.keys(m).forEach(function(k){ if (m[k] && m[k].presence) m[k].presence(list.slice()); });
   }
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
+  /* entrega uma row da talk como o postgres_changes faria: pros
+     inscritos da sala, MENOS quem enviou (o remetente confirma pelo
+     retorno do INSERT) e menos quem está com o socket caído. */
+  function emitTalkRow(row, exceptClientId){
+    var m = bus.subs[row.room_id] || {};
+    Object.keys(m).forEach(function(k){
+      if (k === exceptClientId) return;
+      var dono = bus.clients[k];
+      if (dono && dono.talkDown) return;
+      if (m[k] && m[k].talk) m[k].talk(clone(row));
+    });
+  }
   var api = {
     kind: 'fake', store: store,
     listMyRooms: function(token){
@@ -1214,6 +1238,39 @@ function createFakeAdapter(){
       store.members = store.members.filter(function(m){ return m.room_id !== roomId; });
       store.pins = store.pins.filter(function(p){ return p.room_id !== roomId; });
       store.photos = store.photos.filter(function(p){ return p.room_id !== roomId; });
+      store.talk = store.talk.filter(function(t){ return t.room_id !== roomId; });
+      return Promise.resolve(true);
+    },
+    /* ---- fala pelo banco (v1.4.3): tabela talk + postgres_changes ----
+       addTalk grava a row e "emite" pros OUTROS clientes da sala pelo
+       barramento (é a via rápida); quem está com o socket caído
+       (talkDown) NÃO recebe — só o catch-up (listTalk) salva, igual
+       ao desenho real. Falhas injetáveis: bus.talkFailAll = true ou
+       bus.talkFailNext = n (as próximas n inserções rejeitam). */
+    addTalk: function(data){
+      if (bus.talkFailAll || (bus.talkFailNext | 0) > 0){
+        if (!bus.talkFailAll) bus.talkFailNext--;
+        return Promise.reject(new Error('falha simulada no INSERT da fala'));
+      }
+      var now = Date.now();
+      var row = {
+        id: rid(), room_id: data.room_id, author_token: data.author_token,
+        author_name: data.author_name || '', texto: data.texto,
+        pra_token: data.pra_token || null,
+        created_at: new Date(now).toISOString(),
+        expires_at: new Date(now + 3 * 60 * 1000).toISOString()
+      };
+      store.talk.push(row);
+      emitTalkRow(row, clientId);
+      return Promise.resolve(clone(row));
+    },
+    listTalk: function(roomId){
+      var rows = store.talk.filter(function(t){ return t.room_id === roomId; });
+      rows.sort(function(a, b){ return String(a.created_at).localeCompare(String(b.created_at)); });
+      return Promise.resolve(clone(rows));
+    },
+    deleteTalk: function(id){
+      store.talk = store.talk.filter(function(t){ return t.id !== id; });
       return Promise.resolve(true);
     },
     listPins: function(roomId){
@@ -1276,7 +1333,7 @@ function createFakeAdapter(){
       store.uploads.push({ room_id: roomId, path: path, roomPhoto: true, size: blob && blob.size ? blob.size : 0 });
       return Promise.resolve({ url: SB_URL + '/storage/v1/object/public/photos/' + path, path: path });
     },
-    subscribeRoom: function(roomId, cbs){ (bus.subs[roomId] = bus.subs[roomId] || {})[clientId] = cbs; return Promise.resolve(true); },
+    subscribeRoom: function(roomId, cbs){ myCbs[roomId] = cbs; (bus.subs[roomId] = bus.subs[roomId] || {})[clientId] = cbs; return Promise.resolve(true); },
     unsubscribeRoom: function(roomId){ var m = bus.subs[roomId]; if (m) delete m[clientId]; return Promise.resolve(true); },
     track: function(roomId, meta){
       var list = presenceMap[roomId] || [];
@@ -1323,7 +1380,39 @@ function createFakeAdapter(){
         if (m[k] && m[k].presence) m[k].presence(list.slice());
       });
     },
-    __presence: function(roomId){ return (presenceMap[roomId] || []).slice(); }
+    __presence: function(roomId){ return (presenceMap[roomId] || []).slice(); },
+    /* ---- ganchos da fala pelo banco (v1.4.3) ----
+       __talkSetDown(true): o "socket" DESTE cliente cai — ele para de
+       receber a via rápida (postgres_changes), como o iPhone em 2º
+       plano. O REST (listTalk) continua funcionando.
+       __talkReconnect(roomId): o socket volta — dispara o gancho de
+       reconexão do cliente (que faz o catch-up), igual ao rejoin do
+       canal real. */
+    __talkSetDown: function(down){
+      bus.clients[clientId].talkDown = !!down;
+      return Promise.resolve(true);
+    },
+    __talkReconnect: function(roomId){
+      bus.clients[clientId].talkDown = false;
+      var cbs = myCbs[roomId];
+      if (cbs && cbs.reconnect) cbs.reconnect();
+      return Promise.resolve(true);
+    },
+    /* injeta uma row DIRETO no servidor e emite pra todos os
+       inscritos com o socket de pé (inclusive quem "seria" o autor) */
+    __emitTalk: function(roomId, data){
+      var now = Date.now();
+      var row = {
+        id: data.id || rid(), room_id: roomId,
+        author_token: data.author_token, author_name: data.author_name || '',
+        texto: data.texto, pra_token: data.pra_token || null,
+        created_at: data.created_at || new Date(now).toISOString(),
+        expires_at: data.expires_at || new Date(now + 3 * 60 * 1000).toISOString()
+      };
+      store.talk.push(row);
+      emitTalkRow(row, null);
+      return clone(row);
+    }
   };
   return api;
 }
@@ -1357,10 +1446,17 @@ function createRealAdapter(){
     ch.on('broadcast', { event: 'pon' }, function(msg){
       if (st.cbs && msg && msg.payload) st.cbs.event(msg.payload.type, msg.payload);
     });
+    /* fala pelo banco (v1.4.3): a via rápida é o INSERT na tabela
+       talk chegando por postgres_changes NESTE mesmo canal */
+    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'talk', filter: 'room_id=eq.' + roomId }, function(payload){
+      if (st.cbs && st.cbs.talk && payload && payload.new) st.cbs.talk(payload.new);
+    });
     st.ready = new Promise(function(res){
       ch.subscribe(function(status){
         st.status = status;
         if (status === 'SUBSCRIBED'){
+          var rejoin = !!st.everSub;
+          st.everSub = true;
           res(true);
           /* CAUSA-RAIZ do bug "estou na sala mas não apareço": quando a
              conexão cai (celular dorme, rede troca, aba congela) e o
@@ -1369,6 +1465,10 @@ function createRealAdapter(){
              embora o broadcast continue chegando. Por isso: TODA
              (re)inscrição re-anuncia a presença guardada. */
           if (st.wantTrack && st.lastMeta){ st.tracked = true; ch.track(st.lastMeta); }
+          /* rejoin também é o sinal do catch-up da fala: enquanto o
+             socket dormia, INSERTs da talk passaram sem via rápida —
+             o cliente busca o que perdeu (refreshTalk). */
+          if (rejoin && st.cbs && st.cbs.reconnect) st.cbs.reconnect();
         }
       });
     });
@@ -1444,6 +1544,17 @@ function createRealAdapter(){
     },
     deletePhoto: function(id){
       return rows(sb.from('photos').delete().eq('id', id)).then(function(){ return true; });
+    },
+    /* ---- fala pelo banco (v1.4.3): INSERT confirma, GET recolhe ---- */
+    addTalk: function(data){
+      return rows(sb.from('talk').insert(data).select().single());
+    },
+    listTalk: function(roomId){
+      return rows(sb.from('talk').select('*').eq('room_id', roomId).order('created_at', { ascending: true }))
+        .then(function(d){ return d || []; });
+    },
+    deleteTalk: function(id){
+      return rows(sb.from('talk').delete().eq('id', id)).then(function(){ return true; });
     },
     uploadPhoto: function(roomId, token, blob){
       var path = roomId + '/' + token + '-' + Date.now() + '.jpg';
@@ -1541,8 +1652,9 @@ var S = {
   presence: {},         /* roomId -> { token: meta } */
   pins: {},             /* roomId -> [pins] (já filtrados) */
   photos: {},           /* roomId -> [photos] (já filtrados) */
-  speech: {},           /* roomId -> { token: {lines:[{text,exp}], lastAt} } */
-  whispers: {},         /* roomId -> { outroToken: {text, exp, fromMe} } */
+  speech: {},           /* roomId -> { token: {lines:[{id?,lid?,text,exp,st?}], lastAt} } */
+  whispers: {},         /* roomId -> { outroToken: {id?,lid?,text, exp, fromMe, st?} } */
+  talkSeen: {},         /* roomId -> { rowId: 1 } — dedupe das vias da fala (v1.4.3) */
   stageForce: {},       /* roomId -> token forçado ao palco */
   seats: {},            /* roomId -> { token: {x,y} } */
   lastTalkAt: {},       /* roomId -> ts da última fala (qualquer um) */
@@ -1628,8 +1740,20 @@ function roomPhotoImg(room){
 function wireRoom(roomId){
   DB.subscribeRoom(roomId, {
     presence: function(metas){ onPresence(roomId, metas); },
-    event: function(type, payload){ onEvent(roomId, type, payload); }
+    event: function(type, payload){ onEvent(roomId, type, payload); },
+    /* fala pelo banco: via rápida (postgres_changes) + catch-up no rejoin */
+    talk: function(row){ onTalkRow(roomId, row); },
+    reconnect: function(){ refreshTalk(roomId); }
   });
+}
+/* carimbo de prova-de-vida: quem deu sinal na sala ESTÁ na sala —
+   vale pra broadcast (fala antiga, sinal, cutucada) e pra linha da
+   talk que acabou de chegar (v1.4.3). */
+function stampLife(roomId, token){
+  var dPrev = personDisplay(roomId, token);
+  (S.lastHb[roomId] = S.lastHb[roomId] || {})[token] = {
+    at: Date.now(), estado: dPrev.estado !== 'offline' ? dPrev.estado : 'online'
+  };
 }
 function onPresence(roomId, metas){
   var before = S.presence[roomId] || {};
@@ -1662,12 +1786,7 @@ function onEvent(roomId, type, p){
      ficava refém do heartbeat curar a presença: a linha chegava, mas o
      balão só aparecia até 20s depois (o "delay") ou nem aparecia (a
      poltrona virava jaqueta). É o mesmo princípio do evento 'hb'. */
-  if (type !== 'hb' && type !== 'bye'){
-    var dPrev = personDisplay(roomId, p.from);
-    (S.lastHb[roomId] = S.lastHb[roomId] || {})[p.from] = {
-      at: Date.now(), estado: dPrev.estado !== 'offline' ? dPrev.estado : 'online'
-    };
-  }
+  if (type !== 'hb' && type !== 'bye') stampLife(roomId, p.from);
   var room = roomById(roomId);
   if (type === 'say'){
     pushSpeech(roomId, p.from, p.text, false);
@@ -1743,6 +1862,7 @@ function removeRoomLocal(roomId){
   delete S.myMembers[roomId]; delete S.members[roomId]; delete S.presence[roomId];
   delete S.lastHb[roomId]; delete S.roomPhotoV[roomId];
   delete S.pins[roomId]; delete S.photos[roomId]; delete S.speech[roomId];
+  delete S.whispers[roomId]; delete S.talkSeen[roomId];
   if (S.currentRoom === roomId){ S.currentRoom = null; showHall(); }
   renderHall();
 }
@@ -1823,14 +1943,154 @@ window.addEventListener('pagehide', sayBye);
 window.addEventListener('focus', heartbeatNow);
 window.addEventListener('pageshow', heartbeatNow);
 
-/* ================= FALA (efêmera) ================= */
-function pushSpeech(roomId, token, text, mine){
+/* ================= FALA (efêmera, pelo banco — v1.4.3) =================
+   Cada linha (fala ou sussurro) é uma row na tabela `talk`, com a
+   MESMA vida do balão (3 min). Enviar = INSERT: o balão nasce
+   otimista ("⏳ enviando…"), o retorno do INSERT vira "✓ entregue";
+   se a rede falha, tenta de novo sozinho (1s, 3s, 8s) e só então a
+   linha vira "não entregue — tocar pra tentar de novo".
+   Receber tem TRÊS vias, fundidas por id (dedupe):
+     1. via rápida: postgres_changes (INSERT na talk);
+     2. catch-up: GET das rows vivas ao entrar na sala e ao socket
+        reconectar — é o que salva a linha dita enquanto o iPhone
+        dormia ("às vezes a mensagem dela não chega", nunca mais);
+     3. sondagem de segurança: GET a cada 5s com a sala aberta.
+   Linha expirada NUNCA renderiza, venha de onde vier; e cada
+   aparelho apaga as PRÓPRIAS rows expiradas ao carregar (o mesmo
+   padrão do mural e das fotos) — a lei segue: nada é arquivado. */
+var TALK_RETRY_MS = [1000, 3000, 8000];
+var TALK_POLL_MS = 5000;
+function talkSeen(roomId, id){ return !!((S.talkSeen[roomId] || {})[id]); }
+function markTalkSeen(roomId, id){ (S.talkSeen[roomId] = S.talkSeen[roomId] || {})[id] = 1; }
+function pushSpeechLine(roomId, token, line){
   var map = (S.speech[roomId] = S.speech[roomId] || {});
   var sp = map[token] || (map[token] = { lines: [], lastAt: 0 });
-  sp.lines.push({ text: String(text || '').slice(0, 140), exp: Date.now() + SPEECH_TTL });
+  sp.lines.push(line);
   while (sp.lines.length > 3) sp.lines.shift();
   sp.lastAt = Date.now();
 }
+function pushSpeech(roomId, token, text, mine){
+  /* caminho de RECEPÇÃO antigo (broadcast 'say'): mantido só pra
+     convivência com cliente desatualizado durante a virada — quem
+     está na v1.4.3+ fala pela talk, nunca por aqui. */
+  pushSpeechLine(roomId, token, { text: String(text || '').slice(0, 140), exp: Date.now() + SPEECH_TTL });
+}
+/* entrega UMA linha minha (fala: praToken null; sussurro: o alvo).
+   A linha carrega o próprio estado: st 'sending' → 'ok' | 'fail'. */
+function deliverTalk(roomId, line, praToken){
+  if (line.id){ line.st = 'ok'; return; }   /* o eco chegou antes: já está no banco */
+  line.tryN = (line.tryN || 0) + 1;
+  DB.addTalk({
+    room_id: roomId, author_token: me.token, author_name: me.name || 'Você',
+    texto: line.text, pra_token: praToken || null
+  }).then(function(row){
+    line.id = row.id; line.st = 'ok';
+    line.exp = new Date(row.expires_at).getTime();
+    markTalkSeen(roomId, row.id);
+    if (S.currentRoom === roomId) renderRoom();
+  }).catch(function(){
+    if (line.tryN <= TALK_RETRY_MS.length){
+      var wait = TALK_RETRY_MS[line.tryN - 1];
+      setTimeout(function(){
+        if (line.st === 'sending' && !line.id) deliverTalk(roomId, line, praToken);
+      }, wait);
+    } else {
+      line.st = 'fail';
+      if (S.currentRoom === roomId) renderRoom();
+    }
+  });
+}
+/* toque numa linha "não entregue": zera as tentativas e manda de novo */
+function findOwnTalk(lid){
+  var found = null;
+  Object.keys(S.speech).forEach(function(rid){
+    var sp = (S.speech[rid] || {})[me.token]; if (!sp || found) return;
+    sp.lines.forEach(function(l){ if (l.lid === lid) found = { roomId: rid, line: l, pra: null }; });
+  });
+  if (found) return found;
+  Object.keys(S.whispers).forEach(function(rid){
+    var wm = S.whispers[rid] || {};
+    Object.keys(wm).forEach(function(t){
+      if (wm[t].fromMe && wm[t].lid === lid) found = { roomId: rid, line: wm[t], pra: t };
+    });
+  });
+  return found;
+}
+function retryTalkLine(lid){
+  var f = findOwnTalk(lid);
+  if (!f || f.line.id || f.line.st !== 'fail') return;
+  f.line.tryN = 0; f.line.st = 'sending';
+  if (S.currentRoom === f.roomId) renderRoom();
+  deliverTalk(f.roomId, f.line, f.pra);
+}
+/* adota uma row MINHA que chegou por alguma via (eco/catch-up):
+   casa com a linha otimista pendente pelo texto, ou cria a linha
+   já entregue (ex.: voltei pra sala e minha fala ainda vive). */
+function adoptOwnTalk(roomId, row, texto, exp){
+  if (row.pra_token){
+    var wm = (S.whispers[roomId] = S.whispers[roomId] || {});
+    var w = wm[row.pra_token];
+    if (w && w.fromMe && !w.id && w.text === texto){ w.id = row.id; w.st = 'ok'; w.exp = exp; }
+    else if (!w) wm[row.pra_token] = { id: row.id, lid: uuid(), text: texto, exp: exp, fromMe: true, st: 'ok' };
+    return;
+  }
+  var sp = (S.speech[roomId] || {})[me.token];
+  if (sp){
+    for (var i = 0; i < sp.lines.length; i++){
+      var l = sp.lines[i];
+      if (!l.id && l.st && l.text === texto){ l.id = row.id; l.st = 'ok'; l.exp = exp; return; }
+    }
+  }
+  pushSpeechLine(roomId, me.token, { id: row.id, lid: uuid(), text: texto, exp: exp, st: 'ok' });
+}
+/* UMA row da talk chegou (via rápida, catch-up ou sondagem): funde
+   no estado local. É o ÚNICO funil de recepção da fala nova. */
+function onTalkRow(roomId, row){
+  if (!row || !row.id || row.room_id !== roomId) return;
+  var exp = new Date(row.expires_at).getTime();
+  if (!(exp > Date.now())) return;                 /* expirada: nunca renderiza */
+  if (talkSeen(roomId, row.id)) return;            /* dedupe entre as vias */
+  markTalkSeen(roomId, row.id);
+  var texto = String(row.texto || '').slice(0, 140);
+  if (row.author_token === me.token){
+    adoptOwnTalk(roomId, row, texto, exp);
+    if (S.currentRoom === roomId) renderRoom();
+    return;
+  }
+  stampLife(roomId, row.author_token);             /* quem falou ESTÁ aqui (regra da v1.4.1) */
+  if (row.pra_token){
+    if (row.pra_token !== me.token) return;        /* sussurro pra outro: invisível neste aparelho */
+    (S.whispers[roomId] = S.whispers[roomId] || {})[row.author_token] =
+      { id: row.id, text: texto, exp: exp, fromMe: false };
+    if (S.currentRoom === roomId){
+      SoundFX.play('pop');
+      toast('🤫', '<b>' + esc(row.author_name || 'Alguém') + '</b> sussurrou pra você');
+    }
+  } else {
+    pushSpeechLine(roomId, row.author_token, { id: row.id, text: texto, exp: exp });
+    S.lastTalkAt[roomId] = Date.now();
+    if (S.currentRoom === roomId) SoundFX.play('pop');
+    renderHall();
+  }
+  if (S.currentRoom === roomId) renderRoom();
+}
+/* catch-up: busca as rows vivas da sala e funde uma a uma; as MINHAS
+   já expiradas, apago do banco (padrão mural/fotos). */
+function refreshTalk(roomId){
+  return DB.listTalk(roomId).then(function(list){
+    var now = Date.now();
+    (list || []).forEach(function(row){
+      if (new Date(row.expires_at).getTime() <= now){
+        if (row.author_token === me.token) DB.deleteTalk(row.id).catch(function(){});
+        return;
+      }
+      onTalkRow(roomId, row);
+    });
+  }).catch(function(){});
+}
+/* sondagem de segurança: com a sala aberta, recolhe a cada 5s o que
+   qualquer via tenha deixado passar */
+setInterval(function(){ if (S.currentRoom) refreshTalk(S.currentRoom); }, TALK_POLL_MS);
 function liveSpeakers(roomId){
   var map = S.speech[roomId] || {};
   return Object.keys(map).filter(function(t){
@@ -1953,6 +2213,7 @@ function enterRoom(roomId){
   refreshMembers(roomId).then(function(){ notifyEnter(roomId); });
   refreshPins(roomId);
   refreshPhotos(roomId);
+  refreshTalk(roomId);   /* catch-up: a conversa dos últimos 3 min me alcança */
   renderRoom();
   updateSky();
   setTimeout(function(){ focusOn(me.token); }, 60);
@@ -1996,21 +2257,37 @@ function balloonDims(lines){
   var hgt = linesWrapped * 16 + lines.length * 4 + 22;
   return { w: w, h: hgt };
 }
+/* selo de entrega das MINHAS linhas: ⏳ enviando… · ✓ entregue ·
+   ⚠️ não entregue (e o toque na linha tenta de novo) */
+function talkMark(line){
+  if (!line || !line.st) return '';
+  if (line.st === 'sending') return ' <span class="lst sending">⏳ enviando…</span>';
+  if (line.st === 'ok') return ' <span class="lst ok">✓</span>';
+  if (line.st === 'fail') return ' <span class="lst fail">⚠️ não entregue — tocar pra tentar de novo</span>';
+  return '';
+}
 function balloonHtml(roomId, token){
   var sp = (S.speech[roomId] || {})[token];
   if (!sp || !sp.lines.length) return '';
   var lines = sp.lines.filter(function(l){ return l.exp > Date.now(); });
   if (!lines.length) return '';
   var minExp = Math.min.apply(null, lines.map(function(l){ return l.exp; }));
-  var inner = lines.map(function(l){ return '<div>' + esc(l.text) + '</div>'; }).join('');
-  return '<div class="balloon' + (token === me.token ? ' mine' : '') + '" data-lines="' + lines.length + '">'
+  var mine = token === me.token;
+  var inner = lines.map(function(l){
+    var attrs = ' class="bline"';
+    if (mine && l.st === 'fail' && l.lid) attrs = ' class="bline fail" data-retry="' + esc(l.lid) + '"';
+    return '<div' + attrs + '>' + esc(l.text) + (mine ? talkMark(l) : '') + '</div>';
+  }).join('');
+  return '<div class="balloon' + (mine ? ' mine' : '') + '" data-lines="' + lines.length + '">'
     + inner + '<span class="cd">⏳ ' + cdText(minExp) + '</span></div>';
 }
 function whisperHtml(roomId, token){
   var wm = S.whispers[roomId] || {};
   var w = wm[token];
   if (!w || w.exp <= Date.now()) return '';
-  return '<div class="whisper-bal' + (w.fromMe ? ' mine' : '') + '">🤫 ' + esc(w.text)
+  var attrs = (w.fromMe && w.st === 'fail' && w.lid) ? ' data-retry="' + esc(w.lid) + '"' : '';
+  return '<div class="whisper-bal' + (w.fromMe ? ' mine' : '') + '"' + attrs + '>🤫 ' + esc(w.text)
+    + (w.fromMe ? talkMark(w) : '')
     + '<span class="cd">sussurro · ' + cdText(w.exp) + '</span></div>';
 }
 function charHtml(roomId, token, idx){
@@ -2648,9 +2925,13 @@ function say(text){
   var roomId = S.currentRoom; if (!roomId) return;
   text = String(text || '').trim(); if (!text) return;
   revealIfGhost(roomId);
-  pushSpeech(roomId, me.token, text, true);
+  /* v1.4.3: a linha nasce otimista no balão e viaja pela talk —
+     o INSERT confirma (✓) ou a linha pede novo toque. O push sai da
+     AÇÃO de enviar (não da chegada), como sempre. */
+  var line = { lid: uuid(), text: text.slice(0, 140), exp: Date.now() + SPEECH_TTL, st: 'sending', tryN: 0 };
+  pushSpeechLine(roomId, me.token, line);
   S.lastTalkAt[roomId] = Date.now();
-  DB.broadcast(roomId, 'say', { from: me.token, name: me.name, text: text });
+  deliverTalk(roomId, line, null);
   notifyRoom(roomId, 'say', { text: text.slice(0, 60) });
   SoundFX.play('popme');
   el('talkInput').value = '';
@@ -2659,8 +2940,12 @@ function say(text){
 }
 function sendWhisper(roomId, token, text){
   revealIfGhost(roomId);
-  (S.whispers[roomId] = S.whispers[roomId] || {})[token] = { text: text, exp: Date.now() + WHISPER_TTL, fromMe: true };
-  DB.broadcast(roomId, 'whisper', { from: me.token, to: token, name: me.name, text: text });
+  /* sussurro também é row da talk (pra_token = o alvo): só o aparelho
+     dele renderiza. A vida é a da row (3 min), como a fala — o banco
+     é o transporte, e o que o banco não guarda mais, não existe. */
+  var w = { lid: uuid(), text: String(text || '').slice(0, 140), exp: Date.now() + SPEECH_TTL, fromMe: true, st: 'sending', tryN: 0 };
+  (S.whispers[roomId] = S.whispers[roomId] || {})[token] = w;
+  deliverTalk(roomId, w, token);
   SoundFX.play('popme');
   closeSheet();
   renderRoom();
@@ -3166,6 +3451,12 @@ el('vbMural').addEventListener('click', openMuralSheet);
 el('vbFoto').addEventListener('click', function(){ openPersonSheet(S.currentRoom, me.token); });
 el('btnAloneMural').addEventListener('click', openMuralSheet);
 el('corkboard').addEventListener('click', openMuralSheet);
+/* toque numa linha MINHA "não entregue" = tentar de novo (v1.4.3).
+   Em captura, pra ganhar do toque que abriria a ficha da pessoa. */
+el('roomChars').addEventListener('click', function(ev){
+  var t = ev.target && ev.target.closest ? ev.target.closest('[data-retry]') : null;
+  if (t){ ev.stopPropagation(); ev.preventDefault(); retryTalkLine(t.getAttribute('data-retry')); }
+}, true);
 el('btnBirth').addEventListener('click', openCreateSheet);
 el('btnJoinCode').addEventListener('click', function(){ joinByCode(el('joinCodeInput').value); });
 el('joinCodeInput').addEventListener('keydown', function(ev){ if (ev.key === 'Enter') joinByCode(this.value); });
@@ -3214,6 +3505,7 @@ function boot(){
                  openSettings: openSettings, openRoomMenu: openRoomMenu, openMuralSheet: openMuralSheet,
                  renameRoom: renameRoom, setRoomPhotoFromDataUrl: setRoomPhotoFromDataUrl,
                  heartbeat: heartbeatNow, isPresent: isPresent,
+                 refreshTalk: refreshTalk, retryTalkLine: retryTalkLine, onTalkRow: onTalkRow,
                  push: { supported: pushSupported, enable: enablePush, disable: disablePush,
                          subscription: pushSubscription, notifyRoom: notifyRoom, updateBtn: updatePushBtn },
                  sound: SoundFX,
