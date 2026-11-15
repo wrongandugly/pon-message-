@@ -298,6 +298,11 @@
       #menuMascotBtn canvas { width:min(196px,52vw); }
       /* easter egg: the 30-poke coin burst + floating prize */
       #cardMascotBtn, #menuMascotBtn { position: relative; }
+      #menuMascotBtn { transition: transform .18s ease; }
+      #menuMascotBtn.eggDodge { transform: translateX(30px) rotate(4deg); }
+      #menuMascotBtn.eggFlee { transform: translateX(135%); transition: transform .3s ease-in; }
+      #menuMascotBtn.eggSpin { animation: eggSpinAnim .6s ease; }
+      @keyframes eggSpinAnim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       .eggCoin, .eggPlus { position: absolute; left: 50%; top: 42%; pointer-events: none; z-index: 5; }
       .eggCoin { font-size: 20px; animation: eggFly .85s ease-out forwards; }
       .eggPlus {
@@ -1343,6 +1348,8 @@
         g.clearRect(0, 0, w, h);
         g.lineJoin = "round"; g.lineCap = "round";
         var ink = "#141416", sq = 1 - flinch * 0.3;
+        var annoyed = (typeof menuAnnoyedUntil !== "undefined") && performance.now() < menuAnnoyedUntil;
+        var shades = (typeof eggShadesOn !== "undefined") && eggShadesOn;
         g.save(); g.translate(cx, cy + 10); g.scale(1 + flinch * 0.2, sq); g.translate(-cx, -cy - 10);
         // hood body in the picked colour
         g.fillStyle = hood || "#232327"; g.strokeStyle = ink; g.lineWidth = 6;
@@ -1357,7 +1364,7 @@
         g.strokeStyle = "rgba(20,20,22,.7)"; g.lineWidth = 3.4;
         g.beginPath(); g.ellipse(cx + 8, cy + 4, 90, 78, 0, 0, Math.PI * 2); g.stroke();
         g.strokeStyle = ink;
-        if (flinch > 0.4) {
+        if (flinch > 0.4 || annoyed) {
           g.lineWidth = 5;
           g.beginPath(); g.moveTo(cx - 26, cy - 22); g.lineTo(cx + 24, cy - 22); g.stroke();
           g.beginPath(); g.moveTo(cx + 52, cy - 20); g.lineTo(cx + 72, cy - 20); g.stroke();
@@ -1378,13 +1385,26 @@
           g.fillStyle = "#7a1f1f"; g.beginPath(); g.ellipse(cx + 6, cy + 38, 9, 12, 0, 0, Math.PI * 2); g.fill();
           g.beginPath();
         }
-        else if (flinch > 0.4) { g.moveTo(cx - 48, cy + 38); g.lineTo(cx + 46, cy + 36); g.quadraticCurveTo(cx + 60, cy + 36, cx + 64, cy + 44); }
+        else if (flinch > 0.4 || annoyed) { g.moveTo(cx - 48, cy + 38); g.lineTo(cx + 46, cy + 36); g.quadraticCurveTo(cx + 60, cy + 36, cx + 64, cy + 44); }
         else { g.moveTo(cx - 54, cy + 26); g.quadraticCurveTo(cx - 30, cy + 44, cx, cy + 45); g.quadraticCurveTo(cx + 28, cy + 46, cx + 50, cy + 34); g.quadraticCurveTo(cx + 66, cy + 26, cx + 72, cy + 8); }
         g.stroke();
-        if (flinch <= 0.4) {
+        if (flinch <= 0.4 && !annoyed) {
           g.fillStyle = "#fffef7"; g.lineWidth = 3.6;
           g.beginPath(); g.moveTo(cx + 14, cy + 43); g.lineTo(cx + 36, cy + 41); g.lineTo(cx + 35, cy + 58); g.quadraticCurveTo(cx + 24, cy + 63, cx + 15, cy + 57); g.closePath(); g.fill(); g.stroke();
           g.beginPath(); g.moveTo(cx + 38, cy + 40); g.lineTo(cx + 54, cy + 35); g.lineTo(cx + 52, cy + 50); g.quadraticCurveTo(cx + 44, cy + 55, cx + 39, cy + 51); g.closePath(); g.fill(); g.stroke();
+        }
+        if (shades) {
+          // EGG SHADES: won with 100 pokes in a day, worn until
+          // tomorrow — drawn inside the squish transform, so the
+          // glasses squash and spring along with him
+          g.fillStyle = "#101013"; g.strokeStyle = ink; g.lineWidth = 4;
+          g.beginPath(); g.ellipse(cx, cy - 20, 36, 44, 0.04, 0, Math.PI * 2); g.fill(); g.stroke();
+          g.beginPath(); g.ellipse(cx + 62, cy - 18, 17, 21, -0.06, 0, Math.PI * 2); g.fill(); g.stroke();
+          g.beginPath(); g.moveTo(cx + 34, cy - 26); g.lineTo(cx + 46, cy - 24); g.stroke();
+          g.beginPath(); g.moveTo(cx + 78, cy - 22); g.quadraticCurveTo(cx + 98, cy - 26, cx + 108, cy - 12); g.stroke();
+          g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = 3;
+          g.beginPath(); g.moveTo(cx - 18, cy - 44); g.lineTo(cx - 4, cy - 8); g.stroke();
+          g.strokeStyle = ink;
         }
         g.restore();
       }
@@ -1462,14 +1482,15 @@
          The once-a-day lock keeps the scarce coin economy safe:
          nobody farms the prestige skin by poking. If storage is
          unavailable the pokes just stay pokes — nothing breaks. */
+      var eggShadesOn = false, menuAnnoyedUntil = 0;
       var EGG_KEY = "wuEggV1", EGG_TAPS = 30, EGG_PRIZE = 100;
       function eggLoad() {
-        var today = todayKey(), d = { day: today, taps: 0, claimed: false };
+        var today = todayKey(), d = { day: today, taps: 0, claimed: false, total: 0, shades: false };
         try {
           var raw = window.localStorage.getItem(EGG_KEY);
           if (raw) {
             var p = JSON.parse(raw);
-            if (p && p.day === today) { d.taps = p.taps | 0; d.claimed = !!p.claimed; }
+            if (p && p.day === today) { d.taps = p.taps | 0; d.claimed = !!p.claimed; d.total = p.total | 0; d.shades = !!p.shades; }
           }
         } catch (e) {}
         return d;
@@ -1477,16 +1498,65 @@
       function eggSave(d) {
         try { window.localStorage.setItem(EGG_KEY, JSON.stringify(d)); } catch (e) {}
       }
+      eggShadesOn = !!eggLoad().shades;
       function eggTap() {
         var d = eggLoad();
-        if (d.claimed) return; // already paid today — a poke is just a poke
+        d.total++;
+        if (d.total >= 100 && !d.shades) {
+          d.shades = true; eggSave(d);
+          eggShadesCelebrate();
+        }
+        if (d.claimed) { eggSave(d); eggReact(d.total); return; }
         d.taps++;
         if (d.taps >= EGG_TAPS) {
           d.taps = 0; d.claimed = true; eggSave(d);
           totalCoins += EGG_PRIZE;
           updateHud(); refreshWallet(); saveGame();
           eggCelebrate();
-        } else eggSave(d);
+        } else { eggSave(d); eggReact(d.total); }
+      }
+      function eggFloat(btn, txt) {
+        var p = document.createElement("span");
+        p.className = "eggPlus"; p.textContent = txt;
+        btn.appendChild(p);
+        setTimeout(function () { p.remove(); }, 1100);
+      }
+      /* ESCALATING REACTIONS (egg layer 1): the day's poke count
+         crosses 5 / 10 / 20 and he answers — annoyed face, a dodge,
+         a full spin. Charm only: no coins, no counter, no HUD. */
+      function eggReact(total) {
+        if (state !== "menu") return;
+        var btn = document.getElementById("menuMascotBtn");
+        if (!btn) return;
+        if (total === 5) {
+          menuAnnoyedUntil = performance.now() + 750;
+          drawMenuMascot();
+          setTimeout(drawMenuMascot, 790);
+          eggFloat(btn, "\u{1F4A2}");
+        } else if (total === 10) {
+          btn.classList.add("eggDodge");
+          sndBoing();
+          setTimeout(function () { btn.classList.remove("eggDodge"); }, 480);
+        } else if (total === 20) {
+          btn.classList.add("eggSpin");
+          sndSquishScream();
+          setTimeout(function () { btn.classList.remove("eggSpin"); }, 650);
+        }
+      }
+      /* THE 100-POKE PRIZE (egg layer 2): he FLEES the screen and
+         comes back wearing shades — and keeps them until tomorrow
+         (the flag lives in the egg state, keyed by day). */
+      function eggShadesCelebrate() {
+        sndCeleb();
+        var btn = document.getElementById(state === "onboard" ? "cardMascotBtn" : "menuMascotBtn");
+        if (!btn) { eggShadesOn = true; return; }
+        btn.classList.add("eggFlee");
+        setTimeout(function () {
+          eggShadesOn = true;
+          drawMenuMascot();
+          btn.classList.remove("eggFlee");
+          eggFloat(btn, "\u{1F60E}");
+        }, 380);
       }
       function eggCelebrate() {
         sndCoin(); setTimeout(sndCoin, 95); sndCeleb();
