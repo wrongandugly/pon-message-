@@ -3287,6 +3287,14 @@
           ctx.restore();
         }
 
+        // STORM-CAR ONLY: his head shrinks down into the cab so
+        // the VEHICLE is the star of this skin (Fabricio, 2026-11-15).
+        // Ears, head, eyes, the windshield ring/mast and the mouth
+        // all live inside this transform; the car body, drawn
+        // before, and the boost effects, drawn after, stay full size.
+        var stormHead = currentSkin.accessory === "stormcar";
+        if (stormHead) { ctx.save(); ctx.translate(0, 8); ctx.scale(0.62, 0.62); }
+
         // ears
         ctx.fillStyle = "#fffef7"; ctx.strokeStyle = ink; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(-52, -14, 13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -3533,6 +3541,8 @@
         ctx.beginPath();
         ctx.moveTo(20, 7.4); ctx.lineTo(29, 5); ctx.lineTo(27.6, 12.4); ctx.quadraticCurveTo(23, 14.8, 20.6, 12.6); ctx.closePath(); ctx.fill(); ctx.stroke();
         }
+
+        if (stormHead) ctx.restore();
 
         // coffee shield ring + orbiting cup
         if (hasShield) {
