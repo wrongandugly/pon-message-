@@ -390,6 +390,19 @@
       .againdexDoor b { color: #c9cdd4; font-weight: 400; }
       .againdexDoor:hover, .againdexDoor:focus { color: #f2c230; }
       .againdexDoor:hover b, .againdexDoor:focus b { color: #f2c230; }
+      .rescueDoor {
+        display: block; margin: 2px auto; padding: 4px 6px; width: 100%;
+        font-family: inherit; font-size: 14px; color: #9aa0a8;
+        background: none; border: none; cursor: pointer; text-align: center;
+      }
+      .rescueDoor b { color: #c9cdd4; font-weight: 400; }
+      #rescueBanner {
+        position: fixed; left: 50%; top: 14px; transform: translateX(-50%);
+        z-index: 999; max-width: 88vw; padding: 12px 16px;
+        background: #fff; color: #232327; border: 3px solid #232327;
+        border-radius: 14px; font-size: 16px; font-weight: 700;
+        text-align: center; box-shadow: 0 6px 0 rgba(35,35,39,.35); cursor: pointer;
+      }
       #menuTop .hOn { color: #d43a2e; }
       #menuTop .hOff { color: #c9c9c4; }
       .menuRow { display: flex; gap: 10px; }
@@ -620,6 +633,7 @@
           <button class="btn" id="shareBtnMenu" type="button">📤 Share</button>
           <button class="btn" id="langMenuBtn" type="button">🌐 English</button>
           <a class="againdexDoor" href="https://againdex.com" target="_blank" rel="noopener"><b>Againdex</b> — would you buy it again? ↗</a>
+          <button class="rescueDoor" id="rescueBtn" type="button">🎁 <b>rescue code</b></button>
           <div id="howBox" hidden>
             <p class="shortHow" id="howText"><b>One tap to flap.</b> Get through the gates. That's the whole tutorial.<br />☕ coffee = a shield · 🍵 tea = super flight · 🧲 magnet = coins come to you · 🌶️ pimenta wrong = breathe fire, smash ONE obstacle · 🍬 bala azeda = he SHRINKS until he gets hit — tiny body, but the gates grow thorns and close in. Moving gates, wind, weird gravity, one rude bird and the odd missile included. No extra charge.</p>
           </div>
@@ -1645,7 +1659,18 @@
       function loadSave() {
         var s = null;
         try { var raw = window.localStorage.getItem(SAVE_KEY); if (raw) s = JSON.parse(raw); } catch (e) {}
-        if (!s || !s.profileDone || !s.playerName) return false;
+        if (!s) return false;
+        if (!s.profileDone || !s.playerName) {
+          // a half-finished profile still keeps its wallet and skins —
+          // a rescue grant lands here before the player re-registers,
+          // and the onboarding flow below preserves both into the menu save
+          totalCoins = Math.max(0, s.totalCoins | 0);
+          walletSeenTotal = totalCoins;
+          if (s.unlockedSkins) for (var pj = 0; pj < s.unlockedSkins.length; pj++) unlockedSkins[s.unlockedSkins[pj]] = true;
+          if (s.currentSkinId) for (var pk = 0; pk < SKINS.length; pk++)
+            if (SKINS[pk].id === s.currentSkinId && unlockedSkins[SKINS[pk].id]) currentSkin = SKINS[pk];
+          return false;
+        }
         saveSuspended = true;
         if (s.lang && LANG_ORDER.indexOf(s.lang) >= 0) lang = s.lang;
         muted = !!s.muted;
@@ -7290,8 +7315,74 @@
       document.getElementById("outMapBtn").addEventListener("click", function () { showMap(); });
       document.getElementById("outMenuBtn").addEventListener("click", function () { showMenu(); });
 
+      /* ---------------- rescue codes (support grants) ----------------
+         One-time grants for a player whose device save was lost.
+         A grant is keyed ONLY by the FNV hash of its code (the code
+         itself never ships in this file). Each code works ONCE per
+         device: redeemed hashes live in their own localStorage key
+         (wuRescueV1), separate from the game save. A code can be
+         typed via the menu's "🎁 rescue code" button — the way that
+         works inside the installed app too — or arrive in the link
+         as ?r=CODE. Grants ADD coins and unlock the named skin,
+         equipped on the spot; journey stars are never touched. */
+      var RESCUE_KEY = "wuRescueV1";
+      var RESCUE_GRANTS = {
+        "1174039169": { coins: 600, skin: "stormcar" } // tester grant, 2026-11-15: 600 coins + Storm-Chaser, no levels
+      };
+      var RESCUE_TXT = {
+        en: { ok: "🎁 Rescue landed: +{c} coins — and the {s} is yours again!", used: "That rescue code was already used on this device.", bad: "Hmm — that code doesn't ring a bell. Check it and try again.", ask: "Type your rescue code:" },
+        pt: { ok: "🎁 Resgate feito: +{c} moedas — e o {s} é seu de novo!", used: "Esse código de resgate já foi usado neste aparelho.", bad: "Hmm — esse código não confere. Confere as letras e tenta de novo.", ask: "Digite seu código de resgate:" },
+        es: { ok: "🎁 Rescate listo: +{c} monedas — ¡y el {s} es tuyo otra vez!", used: "Ese código de rescate ya se usó en este dispositivo.", bad: "Mmm — ese código no suena. Revísalo e inténtalo de nuevo.", ask: "Escribe tu código de rescate:" },
+        ja: { ok: "🎁 レスキュー完了：+{c}コイン — {s} が戻ってきた！", used: "そのレスキューコードはこの端末で使用済みです。", bad: "うーん、そのコードは違います。確認してもう一度どうぞ。", ask: "レスキューコードを入力：" }
+      };
+      function rescueUsedList() {
+        try { var u = JSON.parse(window.localStorage.getItem(RESCUE_KEY) || "[]"); return Array.isArray(u) ? u : []; } catch (e) { return []; }
+      }
+      function rescueBanner(msg) {
+        var old = document.getElementById("rescueBanner"); if (old) old.remove();
+        var b = document.createElement("div");
+        b.id = "rescueBanner"; b.textContent = msg;
+        b.addEventListener("click", function () { b.remove(); });
+        document.body.appendChild(b);
+        setTimeout(function () { if (b.parentNode) b.remove(); }, 8000);
+      }
+      function tryRescue(code) {
+        if (!code) return;
+        var T = RESCUE_TXT[lang] || RESCUE_TXT.en;
+        var norm = String(code).toUpperCase().replace(/[^A-Z0-9-]/g, "");
+        if (!norm) return;
+        var h = String(seedFromString(norm));
+        var g = RESCUE_GRANTS[h];
+        if (!g) { rescueBanner(T.bad); return; }
+        if (rescueUsedList().indexOf(h) >= 0) { rescueBanner(T.used); return; }
+        try { var u = rescueUsedList(); u.push(h); window.localStorage.setItem(RESCUE_KEY, JSON.stringify(u)); } catch (e) {}
+        totalCoins += g.coins;
+        var skinName = "";
+        if (g.skin) {
+          unlockedSkins[g.skin] = true;
+          for (var i = 0; i < SKINS.length; i++) if (SKINS[i].id === g.skin) { currentSkin = SKINS[i]; skinName = SKINS[i].name; }
+        }
+        refreshSkins(); refreshWallet(); updateHud(); saveGame();
+        rescueBanner(T.ok.replace("{c}", g.coins).replace("{s}", skinName || "skin"));
+      }
+      function applyRescueFromUrl() {
+        try {
+          var r = new URLSearchParams(window.location.search).get("r");
+          if (r) {
+            tryRescue(r);
+            if (window.history && window.history.replaceState) window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+          }
+        } catch (e) {}
+      }
+      document.getElementById("rescueBtn").addEventListener("click", function () {
+        var T = RESCUE_TXT[lang] || RESCUE_TXT.en;
+        var code = window.prompt(T.ask);
+        if (code) tryRescue(code);
+      });
+
       /* ---------------- go ---------------- */
       var hadSave = loadSave(); // device save first: a returning player skips the card
+      applyRescueFromUrl(); // a rescue link lands its grant on top of whatever save exists
       buildScenery();
       resize();
       bird.y = H * 0.44;
